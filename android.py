@@ -14,6 +14,7 @@ from kivy.uix.recycleview import RecycleView
 from kivy.uix.recycleview.views import RecycleDataViewBehavior
 from kivy.uix.screenmanager import ScreenManager, Screen
 from kivy.properties import StringProperty
+from kivy.core.window import Window
 
 # --- Data Models copied from app.py (simplified) ---
 class CryptoHolding:
@@ -309,20 +310,20 @@ class CalendarScreen(Screen):
 
         layout = BoxLayout(orientation='vertical')
 
+        self.summary = Label(text='', size_hint_y=0.1, color=(1,1,1,1))
+        layout.add_widget(self.summary)
+
         header = BoxLayout(size_hint_y=0.1)
-        header.add_widget(Button(text='<', on_release=lambda x: self.prev_month()))
-        self.month_label = Label(text='')
+        header.add_widget(Button(text='<', on_release=lambda x: self.prev_month(),
+                                 background_normal='', background_color=(0.2,0.2,0.2,1), color=(1,1,1,1)))
+        self.month_label = Label(text='', color=(1,1,1,1))
         header.add_widget(self.month_label)
-        header.add_widget(Button(text='>', on_release=lambda x: self.next_month()))
+        header.add_widget(Button(text='>', on_release=lambda x: self.next_month(),
+                                 background_normal='', background_color=(0.2,0.2,0.2,1), color=(1,1,1,1)))
         layout.add_widget(header)
 
         self.grid = GridLayout(cols=7)
         layout.add_widget(self.grid)
-
-        bottom = BoxLayout(size_hint_y=0.1)
-        bottom.add_widget(Button(text='Transactions', on_release=lambda x: setattr(app.sm, 'current', 'transactions')))
-        bottom.add_widget(Button(text='Paychecks', on_release=lambda x: setattr(app.sm, 'current', 'paychecks')))
-        layout.add_widget(bottom)
 
         self.add_widget(layout)
         self.update_calendar()
@@ -350,10 +351,13 @@ class CalendarScreen(Screen):
 
         days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
         for d in days:
-            self.grid.add_widget(Label(text=d))
+            self.grid.add_widget(Label(text=d, color=(1,1,1,1)))
 
         cal = calendar.monthcalendar(self.current_year, self.current_month)
         cal_data = self.app.calculator.get_calendar_data(self.current_year, self.current_month)
+
+        income_total = 0
+        expense_total = 0
 
         for week in cal:
             for day in week:
@@ -361,20 +365,32 @@ class CalendarScreen(Screen):
                     self.grid.add_widget(Label(text=''))
                 else:
                     total = cal_data.get(day, {}).get('total', 0)
+                    for t in cal_data.get(day, {}).get('transactions', []):
+                        if t.transaction_type == 'income':
+                            income_total += t.amount
+                        else:
+                            expense_total += t.amount
                     txt = str(day)
                     if total != 0:
                         txt += f"\n${total:.0f}"
-                    btn = Button(text=txt, on_release=lambda x, d=day: self.show_day(d))
+                    btn = Button(text=txt,
+                                 on_release=lambda x, d=day: self.show_day(d),
+                                 background_normal='',
+                                 background_color=(0.2,0.2,0.2,1),
+                                 color=(1,1,1,1))
                     self.grid.add_widget(btn)
+
+        net = income_total - expense_total
+        self.summary.text = f"Income: ${income_total:.0f}  Expenses: ${expense_total:.0f}  Net: ${net:.0f}"
 
     def show_day(self, day):
         selected = date(self.current_year, self.current_month, day)
         items = self.app.calculator.get_transactions_for_date(selected)
         content = BoxLayout(orientation='vertical')
-        content.add_widget(Label(text=selected.strftime('%Y-%m-%d')))
+        content.add_widget(Label(text=selected.strftime('%Y-%m-%d'), color=(1,1,1,1)))
         for t in items:
-            content.add_widget(Label(text=f"{t.name}: {t.amount}"))
-        add_btn = Button(text='Add Transaction')
+            content.add_widget(Label(text=f"{t.name}: {t.amount}", color=(1,1,1,1)))
+        add_btn = Button(text='Add Transaction', background_normal='', background_color=(0.2,0.2,0.2,1), color=(1,1,1,1))
         content.add_widget(add_btn)
 
         popup = Popup(title='Day Detail', content=content, size_hint=(0.8,0.8))
@@ -384,7 +400,8 @@ class CalendarScreen(Screen):
             self.add_transaction(selected)
 
         add_btn.bind(on_release=add_trans)
-        content.add_widget(Button(text='Close', on_release=lambda x: popup.dismiss()))
+        content.add_widget(Button(text='Close', on_release=lambda x: popup.dismiss(),
+                                 background_normal='', background_color=(0.2,0.2,0.2,1), color=(1,1,1,1)))
         popup.open()
 
     def add_transaction(self, selected_date):
@@ -404,7 +421,8 @@ class CalendarScreen(Screen):
             except ValueError:
                 popup.dismiss()
 
-        content.add_widget(Button(text='Add', on_release=done))
+        content.add_widget(Button(text='Add', on_release=done,
+                                 background_normal='', background_color=(0.2,0.2,0.2,1), color=(1,1,1,1)))
         popup = Popup(title='Add Transaction', content=content, size_hint=(0.8,0.6))
         popup.open()
 
@@ -416,9 +434,12 @@ class TransactionsScreen(Screen):
         self.view = TransactionsView(size_hint_y=0.9)
         layout.add_widget(self.view)
         btn_box = BoxLayout(size_hint_y=0.1)
-        btn_box.add_widget(Button(text='Add', on_release=lambda x: self.add()))
-        btn_box.add_widget(Button(text='Save', on_release=lambda x: app.save_data()))
-        btn_box.add_widget(Button(text='Back', on_release=lambda x: setattr(app.sm, 'current', 'calendar')))
+        btn_box.add_widget(Button(text='Add', on_release=lambda x: self.add(),
+                                  background_normal='', background_color=(0.2,0.2,0.2,1), color=(1,1,1,1)))
+        btn_box.add_widget(Button(text='Save', on_release=lambda x: app.save_data(),
+                                  background_normal='', background_color=(0.2,0.2,0.2,1), color=(1,1,1,1)))
+        btn_box.add_widget(Button(text='Back', on_release=lambda x: setattr(app.sm, 'current', 'calendar'),
+                                  background_normal='', background_color=(0.2,0.2,0.2,1), color=(1,1,1,1)))
         layout.add_widget(btn_box)
         self.add_widget(layout)
         self.refresh()
@@ -442,7 +463,8 @@ class TransactionsScreen(Screen):
                 popup.dismiss()
             except ValueError:
                 popup.dismiss()
-        content.add_widget(Button(text='Add', on_release=done))
+        content.add_widget(Button(text='Add', on_release=done,
+                                 background_normal='', background_color=(0.2,0.2,0.2,1), color=(1,1,1,1)))
         popup = Popup(title='Add Transaction', content=content, size_hint=(0.8,0.6))
         popup.open()
 
@@ -454,8 +476,10 @@ class PaycheckScreen(Screen):
         self.view = TransactionsView(size_hint_y=0.9)
         layout.add_widget(self.view)
         btn_box = BoxLayout(size_hint_y=0.1)
-        btn_box.add_widget(Button(text='Add', on_release=lambda x: self.add()))
-        btn_box.add_widget(Button(text='Back', on_release=lambda x: setattr(app.sm, 'current', 'calendar')))
+        btn_box.add_widget(Button(text='Add', on_release=lambda x: self.add(),
+                                  background_normal='', background_color=(0.2,0.2,0.2,1), color=(1,1,1,1)))
+        btn_box.add_widget(Button(text='Back', on_release=lambda x: setattr(app.sm, 'current', 'calendar'),
+                                  background_normal='', background_color=(0.2,0.2,0.2,1), color=(1,1,1,1)))
         layout.add_widget(btn_box)
         self.add_widget(layout)
         self.refresh()
@@ -481,12 +505,106 @@ class PaycheckScreen(Screen):
                 popup.dismiss()
             except ValueError:
                 popup.dismiss()
-        content.add_widget(Button(text='Add', on_release=done))
+        content.add_widget(Button(text='Add', on_release=done,
+                                 background_normal='', background_color=(0.2,0.2,0.2,1), color=(1,1,1,1)))
         popup = Popup(title='Add Paycheck', content=content, size_hint=(0.8,0.6))
         popup.open()
 
+class SavingsScreen(Screen):
+    def __init__(self, app, **kwargs):
+        super().__init__(**kwargs)
+        self.app = app
+        layout = BoxLayout(orientation='vertical')
+        self.view = TransactionsView(size_hint_y=0.9)
+        layout.add_widget(self.view)
+        btn_box = BoxLayout(size_hint_y=0.1)
+        btn_box.add_widget(Button(text='Add', on_release=lambda x: self.add(),
+                                  background_normal='', background_color=(0.2,0.2,0.2,1), color=(1,1,1,1)))
+        btn_box.add_widget(Button(text='Back', on_release=lambda x: setattr(app.sm, 'current', 'calendar'),
+                                  background_normal='', background_color=(0.2,0.2,0.2,1), color=(1,1,1,1)))
+        layout.add_widget(btn_box)
+        self.add_widget(layout)
+        self.refresh()
+
+    def refresh(self):
+        items = [f"{a.name}: {a.balance}" for a in self.app.calculator.savings_accounts]
+        self.view.refresh(items)
+
+    def add(self):
+        content = BoxLayout(orientation='vertical')
+        name = TextInput(hint_text='Account Name')
+        bal = TextInput(hint_text='Balance', input_filter='float')
+        content.add_widget(name)
+        content.add_widget(bal)
+        def done(instance):
+            try:
+                acc = SavingsAccount(name.text, float(bal.text))
+                self.app.calculator.savings_accounts.append(acc)
+                self.app.maybe_auto_save()
+                self.refresh()
+                popup.dismiss()
+            except ValueError:
+                popup.dismiss()
+        content.add_widget(Button(text='Add', on_release=done,
+                                 background_normal='', background_color=(0.2,0.2,0.2,1), color=(1,1,1,1)))
+        popup = Popup(title='Add Account', content=content, size_hint=(0.8,0.6))
+        popup.open()
+
+class PortfolioScreen(Screen):
+    def __init__(self, app, **kwargs):
+        super().__init__(**kwargs)
+        self.app = app
+        layout = BoxLayout(orientation='vertical')
+        self.view = TransactionsView(size_hint_y=0.9)
+        layout.add_widget(self.view)
+        btn_box = BoxLayout(size_hint_y=0.1)
+        btn_box.add_widget(Button(text='Add', on_release=lambda x: self.add(),
+                                  background_normal='', background_color=(0.2,0.2,0.2,1), color=(1,1,1,1)))
+        btn_box.add_widget(Button(text='Back', on_release=lambda x: setattr(app.sm, 'current', 'calendar'),
+                                  background_normal='', background_color=(0.2,0.2,0.2,1), color=(1,1,1,1)))
+        layout.add_widget(btn_box)
+        self.add_widget(layout)
+        self.refresh()
+
+    def refresh(self):
+        items = [f"{h.symbol}: {h.amount}" for h in self.app.calculator.crypto_portfolio.holdings]
+        self.view.refresh(items)
+
+    def add(self):
+        content = BoxLayout(orientation='vertical')
+        sym = TextInput(hint_text='Symbol')
+        amt = TextInput(hint_text='Amount', input_filter='float')
+        content.add_widget(sym)
+        content.add_widget(amt)
+        def done(instance):
+            try:
+                h = CryptoHolding(sym.text, sym.text, float(amt.text))
+                self.app.calculator.crypto_portfolio.add_holding(h)
+                self.app.maybe_auto_save()
+                self.refresh()
+                popup.dismiss()
+            except ValueError:
+                popup.dismiss()
+        content.add_widget(Button(text='Add', on_release=done,
+                                 background_normal='', background_color=(0.2,0.2,0.2,1), color=(1,1,1,1)))
+        popup = Popup(title='Add Holding', content=content, size_hint=(0.8,0.6))
+        popup.open()
+
+class SettingsScreen(Screen):
+    def __init__(self, app, **kwargs):
+        super().__init__(**kwargs)
+        self.app = app
+        layout = BoxLayout(orientation='vertical')
+        layout.add_widget(Label(text='Settings', color=(1,1,1,1)))
+        layout.add_widget(Button(text='Save Data', on_release=lambda x: app.save_data(),
+                                 background_normal='', background_color=(0.2,0.2,0.2,1), color=(1,1,1,1)))
+        layout.add_widget(Button(text='Back', on_release=lambda x: setattr(app.sm, 'current', 'calendar'),
+                                 background_normal='', background_color=(0.2,0.2,0.2,1), color=(1,1,1,1)))
+        self.add_widget(layout)
+
 class BudgieAndroid(App):
     def build(self):
+        Window.clearcolor = (0.1, 0.1, 0.1, 1)
         self.preferences = {}
         self.data_file = os.path.join(os.getcwd(), 'budgie_data.json')
         if os.path.exists(self.data_file):
@@ -498,11 +616,33 @@ class BudgieAndroid(App):
                 self.calculator = BudgetCalculator()
         else:
             self.calculator = BudgetCalculator()
+
         self.sm = ScreenManager()
         self.sm.add_widget(CalendarScreen(self, name='calendar'))
         self.sm.add_widget(TransactionsScreen(self, name='transactions'))
         self.sm.add_widget(PaycheckScreen(self, name='paychecks'))
-        return self.sm
+        self.sm.add_widget(SavingsScreen(self, name='savings'))
+        self.sm.add_widget(PortfolioScreen(self, name='portfolio'))
+        self.sm.add_widget(SettingsScreen(self, name='settings'))
+
+        root = BoxLayout(orientation='vertical')
+        root.add_widget(self.sm)
+
+        nav = BoxLayout(size_hint_y=0.1)
+        def add_nav(text, screen):
+            nav.add_widget(Button(text=text,
+                                  on_release=lambda x: setattr(self.sm, 'current', screen),
+                                  background_normal='', background_color=(0.2,0.2,0.2,1), color=(1,1,1,1)))
+
+        add_nav('Home', 'calendar')
+        add_nav('Trans', 'transactions')
+        add_nav('Pay', 'paychecks')
+        add_nav('Save', 'savings')
+        add_nav('Crypto', 'portfolio')
+        add_nav('Settings', 'settings')
+
+        root.add_widget(nav)
+        return root
 
     def save_data(self):
         with open(self.data_file, 'w') as f:
