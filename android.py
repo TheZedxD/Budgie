@@ -558,6 +558,16 @@ class TransactionItem(BoxLayout, RecycleDataViewBehavior):
 class TransactionsView(RecycleView):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
+        # Use simple labels for each item in the list
+        self.viewclass = 'Label'
+        # Ensure vertical layout for list items
+        from kivy.uix.recycleboxlayout import RecycleBoxLayout
+        self.layout_manager = RecycleBoxLayout(default_size=(None, 40),
+                                               default_size_hint=(1, None),
+                                               size_hint=(1, None),
+                                               orientation='vertical')
+        self.layout_manager.bind(minimum_height=self.layout_manager.setter('height'))
+        self.add_widget(self.layout_manager)
         self.refresh([])
 
     def refresh(self, items):
@@ -787,7 +797,8 @@ class PaycheckScreen(Screen):
         btn_box = BoxLayout(size_hint_y=0.1)
         btn_box.add_widget(Button(text='Add', on_release=lambda x: self.add(),
                                   background_normal='', background_color=(0.2,0.2,0.2,1), color=(1,1,1,1)))
-        btn_box.add_widget(Button(text='Refresh', on_release=lambda x: self.refresh_prices(),
+        # Refresh simply reloads the paycheck list
+        btn_box.add_widget(Button(text='Refresh', on_release=lambda x: self.refresh(),
                                   background_normal='', background_color=(0.2,0.2,0.2,1), color=(1,1,1,1)))
         btn_box.add_widget(Button(text='Back', on_release=lambda x: setattr(app.sm, 'current', 'calendar'),
                                   background_normal='', background_color=(0.2,0.2,0.2,1), color=(1,1,1,1)))
