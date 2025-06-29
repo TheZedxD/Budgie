@@ -316,7 +316,8 @@ class CryptoPortfolio:
     
     def to_dict(self):
         return {
-            'holdings': [holding.to_dict() for holding in self.holdings]
+            'holdings': [holding.to_dict() for holding in self.holdings],
+            'last_updated': self.last_updated.isoformat() if self.last_updated else None
         }
     
     @classmethod
@@ -325,6 +326,12 @@ class CryptoPortfolio:
         for holding_data in data.get('holdings', []):
             holding = CryptoHolding.from_dict(holding_data)
             portfolio.add_holding(holding)
+        last_updated = data.get('last_updated')
+        if last_updated:
+            try:
+                portfolio.last_updated = datetime.fromisoformat(last_updated)
+            except Exception:
+                portfolio.last_updated = None
         return portfolio
 
 class CryptoPriceService:
@@ -558,7 +565,9 @@ class Paycheck:
     
     def calculate_gross_pay(self):
         """Calculate gross pay per pay period"""
-        if self.frequency == "weekly":
+        if self.frequency == "daily":
+            return self.hourly_rate * self.hours_per_week / 5
+        elif self.frequency == "weekly":
             return self.hourly_rate * self.hours_per_week
         elif self.frequency == "bi-weekly":
             return self.hourly_rate * self.hours_per_week * 2
@@ -569,7 +578,9 @@ class Paycheck:
     def calculate_annual_gross(self):
         """Calculate annual gross income"""
         gross_per_period = self.calculate_gross_pay()
-        if self.frequency == "weekly":
+        if self.frequency == "daily":
+            return gross_per_period * 260
+        elif self.frequency == "weekly":
             return gross_per_period * 52
         elif self.frequency == "bi-weekly":
             return gross_per_period * 26
@@ -589,7 +600,12 @@ class Paycheck:
         ss_annual, medicare_annual = TaxCalculator.calculate_fica_taxes(annual_gross)
         
         # Convert to per pay period
-        periods_per_year = 52 if self.frequency == "weekly" else 26 if self.frequency == "bi-weekly" else 12
+        periods_per_year = (
+            260 if self.frequency == "daily" else
+            52 if self.frequency == "weekly" else
+            26 if self.frequency == "bi-weekly" else
+            12
+        )
         
         breakdown = {
             'gross_pay': gross_per_period,
@@ -910,6 +926,7 @@ class CalendarWidget:
                 
                 daily_data = cal_data.get(day, {'total': 0, 'transactions': []})
                 daily_total = daily_data['total']
+                transactions = daily_data['transactions']
                 
                 is_today = is_current_month and day == today.day
                 
@@ -948,31 +965,38 @@ class CalendarWidget:
                             text_color = theme['fg']
                         border_color = theme['border_color']
                 
-                # Create button text
-                if daily_total != 0:
-                    button_text = f"{day}\n${daily_total:+,.0f}"
+                if not transactions:
+                    label = tk.Label(
+                        self.cal_frame,
+                        text=str(day),
+                        bg=theme['frame_bg'],
+                        fg=theme['fg'],
+                        relief=tk.FLAT
+                    )
+                    label.grid(row=row, column=col, padx=1, pady=1, sticky="nsew")
+                    self.day_buttons[day] = label
                 else:
-                    button_text = str(day)
-                
-                # Create day button with proper theming and resizing
-                button = tk.Button(
-                    self.cal_frame,
-                    text=button_text,
-                    bg=bg_color,
-                    fg=text_color,
-                    font=("Arial", 9, "bold" if is_today else "normal"),
-                    relief=tk.RAISED,
-                    bd=border_width,
-                    command=lambda d=day: self.day_clicked(d),
-                    cursor="hand2",
-                    activebackground=bg_color,
-                    activeforeground=text_color,
-                    wraplength=80,  # Wrap text if too long
-                    justify=tk.CENTER
-                )
-                
-                button.grid(row=row, column=col, padx=1, pady=1, sticky="nsew")
-                self.day_buttons[day] = button
+                    # Create button text
+                    button_text = f"{day}\n${daily_total:+,.0f}"
+
+                    button = tk.Button(
+                        self.cal_frame,
+                        text=button_text,
+                        bg=bg_color,
+                        fg=text_color,
+                        font=("Arial", 9, "bold" if is_today else "normal"),
+                        relief=tk.RAISED,
+                        bd=border_width,
+                        command=lambda d=day: self.day_clicked(d),
+                        cursor="hand2",
+                        activebackground=bg_color,
+                        activeforeground=text_color,
+                        wraplength=80,
+                        justify=tk.CENTER
+                    )
+
+                    button.grid(row=row, column=col, padx=1, pady=1, sticky="nsew")
+                    self.day_buttons[day] = button
     
     def day_clicked(self, day):
         if self.on_day_click:
@@ -2959,7 +2983,7 @@ class PaycheckDialog:
         ttk.Label(frame, text="Pay Frequency:").grid(row=3, column=0, sticky=tk.W, pady=5)
         self.frequency_var = tk.StringVar(value="bi-weekly")
         frequency_combo = ttk.Combobox(frame, textvariable=self.frequency_var, width=27)
-        frequency_combo['values'] = ("weekly", "bi-weekly", "monthly")
+        frequency_combo['values'] = ("daily", "weekly", "bi-weekly", "monthly")
         frequency_combo.grid(row=3, column=1, pady=5, padx=(10, 0))
         frequency_combo.state(['readonly'])
         
@@ -3207,7 +3231,7 @@ class EditPaycheckDialog:
         ttk.Label(frame, text="Pay Frequency:").grid(row=3, column=0, sticky=tk.W, pady=5)
         self.frequency_var = tk.StringVar(value=self.paycheck.frequency)
         frequency_combo = ttk.Combobox(frame, textvariable=self.frequency_var, width=27)
-        frequency_combo['values'] = ("weekly", "bi-weekly", "monthly")
+        frequency_combo['values'] = ("daily", "weekly", "bi-weekly", "monthly")
         frequency_combo.grid(row=3, column=1, pady=5, padx=(10, 0))
         frequency_combo.state(['readonly'])
         
@@ -3444,7 +3468,7 @@ class EditTransactionDialog:
         ttk.Label(frame, text="Frequency:").grid(row=5, column=0, sticky=tk.W, pady=5)
         self.frequency_var = tk.StringVar(value=self.transaction.frequency)
         frequency_combo = ttk.Combobox(frame, textvariable=self.frequency_var, width=27)
-        frequency_combo['values'] = ("one-time", "weekly", "bi-weekly", "monthly", "yearly")
+        frequency_combo['values'] = ("one-time", "daily", "weekly", "bi-weekly", "monthly", "yearly")
         frequency_combo.grid(row=5, column=1, pady=5, padx=(10, 0))
         frequency_combo.state(['readonly'])
         
@@ -3555,7 +3579,7 @@ class TransactionDialog:
         ttk.Label(frame, text="Frequency:").grid(row=4, column=0, sticky=tk.W, pady=5)
         self.frequency_var = tk.StringVar(value="monthly")
         frequency_combo = ttk.Combobox(frame, textvariable=self.frequency_var, width=27)
-        frequency_combo['values'] = ("one-time", "weekly", "bi-weekly", "monthly", "yearly")
+        frequency_combo['values'] = ("one-time", "daily", "weekly", "bi-weekly", "monthly", "yearly")
         frequency_combo.grid(row=4, column=1, pady=5, padx=(10, 0))
         frequency_combo.state(['readonly'])
         
