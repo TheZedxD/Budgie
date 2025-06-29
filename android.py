@@ -601,7 +601,8 @@ class CalendarScreen(Screen):
                                  color=(1,1,1,1)))
         layout.add_widget(header)
 
-        self.grid = GridLayout(cols=7)
+        # Larger grid so days are easier to tap
+        self.grid = GridLayout(cols=7, size_hint_y=0.8)
         layout.add_widget(self.grid)
 
         self.add_widget(layout)
@@ -658,8 +659,9 @@ class CalendarScreen(Screen):
                     if (day == today.day and self.current_month == today.month and
                             self.current_year == today.year):
                         bg = (0.1, 0.5, 0.1, 1)
+                    # Increase height for better tap targets
                     btn = Button(text=txt,
-                                 size_hint_y=None, height=40,
+                                 size_hint_y=None, height=60,
                                  on_release=lambda x, d=day: self.show_day(d),
                                  background_normal='',
                                  background_color=bg,
@@ -735,7 +737,12 @@ class TransactionsScreen(Screen):
         super().__init__(**kwargs)
         self.app = app
         layout = BoxLayout(orientation='vertical')
-        self.view = TransactionsView(size_hint_y=0.9)
+
+        # Information label shown above the list
+        self.summary = Label(text='', size_hint_y=0.1, color=(1,1,1,1))
+        layout.add_widget(self.summary)
+
+        self.view = TransactionsView(size_hint_y=0.8)
         layout.add_widget(self.view)
         btn_box = BoxLayout(size_hint_y=0.1)
         btn_box.add_widget(Button(text='Add', on_release=lambda x: self.add(),
@@ -749,11 +756,36 @@ class TransactionsScreen(Screen):
         self.refresh()
 
     def refresh(self):
-        items = [
-            f"{t.name} ({t.transaction_type}, {t.frequency}) "
-            f"{t.category}: {t.amount:+.2f}"
-            for t in self.app.calculator.transactions
-        ]
+        today = datetime.now().date()
+        first = date(today.year, today.month, 1)
+        last = date(today.year, today.month, calendar.monthrange(today.year, today.month)[1])
+
+        items = []
+        income_total = 0
+        expense_total = 0
+
+        current = first
+        while current <= last:
+            txns = self.app.calculator.get_all_transactions_for_date(current)
+            for t in txns:
+                items.append(f"{current.strftime('%Y-%m-%d')} {t.name}: {t.amount:+.2f}")
+                if t.transaction_type == 'income':
+                    income_total += t.amount
+                else:
+                    expense_total += t.amount
+            current += timedelta(days=1)
+
+        net = income_total - expense_total
+        self.summary.text = (f"Income: ${income_total:.2f}  Expenses: ${expense_total:.2f}  "
+                             f"Net: ${net:+.2f}")
+
+        # Include paycheck info
+        if self.app.calculator.paychecks:
+            p_info = ', '.join([
+                f"{p.job_name} ${p.calculate_pay_amount():.2f}" for p in self.app.calculator.paychecks
+            ])
+            self.summary.text += f"\nPaychecks: {p_info}"
+
         self.view.refresh(items)
 
     def add(self):
@@ -799,7 +831,11 @@ class PaycheckScreen(Screen):
         super().__init__(**kwargs)
         self.app = app
         layout = BoxLayout(orientation='vertical')
-        self.view = TransactionsView(size_hint_y=0.9)
+        # Show paycheck summary above the list
+        self.summary = Label(text='', size_hint_y=0.1, color=(1,1,1,1))
+        layout.add_widget(self.summary)
+
+        self.view = TransactionsView(size_hint_y=0.8)
         layout.add_widget(self.view)
         btn_box = BoxLayout(size_hint_y=0.1)
         btn_box.add_widget(Button(text='Add', on_release=lambda x: self.add(),
@@ -818,6 +854,8 @@ class PaycheckScreen(Screen):
             f"{p.job_name} ({p.frequency}) Net: ${p.calculate_pay_amount():.2f}"
             for p in self.app.calculator.paychecks
         ]
+        total = sum(p.calculate_pay_amount() for p in self.app.calculator.paychecks)
+        self.summary.text = f"Total Net Pay: ${total:.2f}"
         self.view.refresh(items)
 
     def add(self):
@@ -857,7 +895,10 @@ class SavingsScreen(Screen):
         super().__init__(**kwargs)
         self.app = app
         layout = BoxLayout(orientation='vertical')
-        self.view = TransactionsView(size_hint_y=0.9)
+        self.summary = Label(text='', size_hint_y=0.1, color=(1,1,1,1))
+        layout.add_widget(self.summary)
+
+        self.view = TransactionsView(size_hint_y=0.8)
         layout.add_widget(self.view)
         btn_box = BoxLayout(size_hint_y=0.1)
         btn_box.add_widget(Button(text='Add', on_release=lambda x: self.add(),
@@ -870,6 +911,8 @@ class SavingsScreen(Screen):
 
     def refresh(self):
         items = [f"{a.name}: {a.balance}" for a in self.app.calculator.savings_accounts]
+        total = sum(a.balance for a in self.app.calculator.savings_accounts)
+        self.summary.text = f"Total Savings: ${total:.2f}"
         self.view.refresh(items)
 
     def add(self):
@@ -898,7 +941,11 @@ class PortfolioScreen(Screen):
         super().__init__(**kwargs)
         self.app = app
         layout = BoxLayout(orientation='vertical')
-        self.view = TransactionsView(size_hint_y=0.9)
+        # Show portfolio total
+        self.summary = Label(text='', size_hint_y=0.1, color=(1,1,1,1))
+        layout.add_widget(self.summary)
+
+        self.view = TransactionsView(size_hint_y=0.8)
         layout.add_widget(self.view)
         btn_box = BoxLayout(size_hint_y=0.1)
         btn_box.add_widget(Button(text='Add', on_release=lambda x: self.add(),
@@ -911,10 +958,13 @@ class PortfolioScreen(Screen):
 
     def refresh(self):
         items = []
+        total = 0
         for h in self.app.calculator.crypto_portfolio.holdings:
             value = h.get_current_value()
+            total += value
             txt = f"{h.symbol}: {h.amount} (Value: ${value:.2f})"
             items.append(txt)
+        self.summary.text = f"Portfolio Value: ${total:.2f}"
         self.view.refresh(items)
 
     def refresh_prices(self):
