@@ -314,12 +314,18 @@ class CalendarScreen(Screen):
         layout.add_widget(self.summary)
 
         header = BoxLayout(size_hint_y=0.1)
-        header.add_widget(Button(text='<', on_release=lambda x: self.prev_month(),
-                                 background_normal='', background_color=(0.2,0.2,0.2,1), color=(1,1,1,1)))
+        header.add_widget(Button(text='<', size_hint_x=0.15,
+                                 on_release=lambda x: self.prev_month(),
+                                 background_normal='',
+                                 background_color=(0.2, 0.2, 0.2, 1),
+                                 color=(1, 1, 1, 1)))
         self.month_label = Label(text='', color=(1,1,1,1))
         header.add_widget(self.month_label)
-        header.add_widget(Button(text='>', on_release=lambda x: self.next_month(),
-                                 background_normal='', background_color=(0.2,0.2,0.2,1), color=(1,1,1,1)))
+        header.add_widget(Button(text='>', size_hint_x=0.15,
+                                 on_release=lambda x: self.next_month(),
+                                 background_normal='',
+                                 background_color=(0.2,0.2,0.2,1),
+                                 color=(1,1,1,1)))
         layout.add_widget(header)
 
         self.grid = GridLayout(cols=7)
@@ -349,9 +355,11 @@ class CalendarScreen(Screen):
         month_name = calendar.month_name[self.current_month]
         self.month_label.text = f"{month_name} {self.current_year}"
 
+        today = date.today()
+
         days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
         for d in days:
-            self.grid.add_widget(Label(text=d, color=(1,1,1,1)))
+            self.grid.add_widget(Label(text=d, size_hint_y=None, height=30, color=(1,1,1,1)))
 
         cal = calendar.monthcalendar(self.current_year, self.current_month)
         cal_data = self.app.calculator.get_calendar_data(self.current_year, self.current_month)
@@ -373,15 +381,22 @@ class CalendarScreen(Screen):
                     txt = str(day)
                     if total != 0:
                         txt += f"\n${total:.0f}"
+                    bg = (0.2,0.2,0.2,1)
+                    if (day == today.day and self.current_month == today.month and
+                            self.current_year == today.year):
+                        bg = (0.1, 0.5, 0.1, 1)
                     btn = Button(text=txt,
+                                 size_hint_y=None, height=40,
                                  on_release=lambda x, d=day: self.show_day(d),
                                  background_normal='',
-                                 background_color=(0.2,0.2,0.2,1),
+                                 background_color=bg,
                                  color=(1,1,1,1))
                     self.grid.add_widget(btn)
 
         net = income_total - expense_total
-        self.summary.text = f"Income: ${income_total:.0f}  Expenses: ${expense_total:.0f}  Net: ${net:.0f}"
+        today_str = today.strftime('%Y-%m-%d')
+        self.summary.text = (f"Income: ${income_total:.0f}  Expenses: ${expense_total:.0f}  "
+                              f"Net: ${net:.0f}  Today: {today_str}")
 
     def show_day(self, day):
         selected = date(self.current_year, self.current_month, day)
@@ -628,9 +643,9 @@ class BudgieAndroid(App):
         root = BoxLayout(orientation='vertical')
         root.add_widget(self.sm)
 
-        nav = BoxLayout(size_hint_y=0.1)
+        nav = BoxLayout(size_hint_y=0.08)
         def add_nav(text, screen):
-            nav.add_widget(Button(text=text,
+            nav.add_widget(Button(text=text, size_hint_x=0.16,
                                   on_release=lambda x: setattr(self.sm, 'current', screen),
                                   background_normal='', background_color=(0.2,0.2,0.2,1), color=(1,1,1,1)))
 
