@@ -571,7 +571,8 @@ class TransactionsView(RecycleView):
         self.refresh([])
 
     def refresh(self, items):
-        self.data = [{'text': i} for i in items]
+        # Ensure text is visible on the dark background by setting the label color
+        self.data = [{'text': i, 'color': (1, 1, 1, 1)} for i in items]
 
 class CalendarScreen(Screen):
     def __init__(self, app, **kwargs):
@@ -763,17 +764,23 @@ class TransactionsScreen(Screen):
         freq = Spinner(text='one-time',
                        values=['one-time', 'weekly', 'bi-weekly', 'monthly', 'yearly'])
         category = TextInput(hint_text='Category')
+        start = TextInput(hint_text='Start Date YYYY-MM-DD')
         content.add_widget(name)
         content.add_widget(amount)
         content.add_widget(t_type)
         content.add_widget(freq)
         content.add_widget(category)
+        content.add_widget(start)
         def done(instance):
             try:
+                sdate = None
+                if start.text:
+                    sdate = datetime.strptime(start.text, '%Y-%m-%d').date()
                 t = Transaction(name.text,
                                 float(amount.text),
                                 t_type.text,
                                 frequency=freq.text,
+                                start_date=sdate,
                                 category=category.text or 'other')
                 self.app.calculator.add_transaction(t)
                 self.app.maybe_auto_save()
@@ -823,11 +830,16 @@ class PaycheckScreen(Screen):
         content.add_widget(hours)
         freq = Spinner(text='bi-weekly',
                        values=['weekly', 'bi-weekly', 'monthly'])
+        start = TextInput(hint_text='Start Date YYYY-MM-DD')
         content.add_widget(freq)
+        content.add_widget(start)
         def done(instance):
             try:
+                sdate = None
+                if start.text:
+                    sdate = datetime.strptime(start.text, '%Y-%m-%d').date()
                 p = Paycheck(name.text, float(rate.text), float(hours.text),
-                             frequency=freq.text)
+                             frequency=freq.text, start_date=sdate)
                 self.app.calculator.add_paycheck(p)
                 self.app.maybe_auto_save()
                 self.refresh()
@@ -968,6 +980,8 @@ class BudgieAndroid(App):
                 with open(self.data_file, 'r') as f:
                     data = json.load(f)
                 self.calculator = BudgetCalculator.from_dict(data)
+                if self.calculator.crypto_portfolio.holdings:
+                    self.calculator.update_crypto_prices()
             except Exception:
                 self.calculator = BudgetCalculator()
         else:
@@ -980,6 +994,11 @@ class BudgieAndroid(App):
         self.sm.add_widget(SavingsScreen(self, name='savings'))
         self.sm.add_widget(PortfolioScreen(self, name='portfolio'))
         self.sm.add_widget(SettingsScreen(self, name='settings'))
+
+        # Refresh screens so loaded data is displayed immediately
+        for screen in self.sm.screens:
+            if hasattr(screen, 'refresh'):
+                screen.refresh()
 
         root = BoxLayout(orientation='vertical')
         root.add_widget(self.sm)
