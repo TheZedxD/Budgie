@@ -1242,26 +1242,14 @@ class BudgieApp:
         self.calendar_widget.get_widget().pack(fill=tk.BOTH, expand=True)
     
     def setup_stats_panel(self, parent):
-        # Create a scrollable frame for the stats panel in case content is too tall
-        canvas = tk.Canvas(parent, highlightthickness=0)
-        scrollbar = ttk.Scrollbar(parent, orient="vertical", command=canvas.yview)
-        scrollable_frame = ttk.Frame(canvas)
-        
-        scrollable_frame.bind(
-            "<Configure>",
-            lambda e: canvas.configure(scrollregion=canvas.bbox("all"))
-        )
-        
-        canvas.create_window((0, 0), window=scrollable_frame, anchor="nw")
-        canvas.configure(yscrollcommand=scrollbar.set)
-        
-        # Pack canvas and scrollbar
-        canvas.pack(side="left", fill="both", expand=True)
-        scrollbar.pack(side="right", fill="y")
-        
-        # Apply theme colors to canvas
+        """Create the left side stats/actions panel"""
+        panel = ttk.Frame(parent)
+        panel.pack(fill=tk.BOTH, expand=True)
+
         theme = self.theme_manager.get_theme()
-        canvas.configure(bg=theme['frame_bg'])
+        panel.configure(style='TFrame')
+
+        scrollable_frame = panel
         
         # Current balance section
         balance_frame = ttk.LabelFrame(scrollable_frame, text="Account Status", padding="10")
@@ -1308,11 +1296,6 @@ class BudgieApp:
         self.summary_frame.pack(fill=tk.X, padx=5, pady=5)
         
         self.update_monthly_summary(datetime.now().year, datetime.now().month)
-        
-        # Bind mousewheel to canvas for scrolling
-        def _on_mousewheel(event):
-            canvas.yview_scroll(int(-1*(event.delta/120)), "units")
-        canvas.bind("<MouseWheel>", _on_mousewheel)
     
     def update_monthly_summary(self, year, month):
         """Update monthly summary for specified year/month"""
@@ -1477,8 +1460,8 @@ class BudgieApp:
         if not self.calculator.paychecks:
             messagebox.showinfo("No Paychecks", "No paychecks to manage.")
             return
-        
-        self.dialog = tk.Topleve(self.root)
+
+        self.dialog = tk.Toplevel(self.root)
         self.dialog.title("Manage Paychecks")
         self.dialog.geometry("1400x600")
         self.dialog.minsize(1200, 500)  # Set minimum size
@@ -1502,14 +1485,25 @@ class BudgieApp:
         list_frame = ttk.Frame(notebook, padding="10")
         notebook.add(list_frame, text="Paycheck List")
         
-        columns = ("Job Name", "Hourly Rate", "Hours/Week", "Frequency", "Gross Pay", "Net Pay", "Start Date", "End Date")
+        columns = (
+            "Job Name",
+            "Hourly Rate",
+            "Hours/Week",
+            "Frequency",
+            "Gross Pay",
+            "Health Ins.",
+            "Other Ded.",
+            "Net Pay",
+            "Start Date",
+            "End Date",
+        )
         tree = ttk.Treeview(list_frame, columns=columns, show="headings")
         
         for col in columns:
             tree.heading(col, text=col)
             if col == "Job Name":
                 tree.column(col, width=120)
-            elif col in ["Gross Pay", "Net Pay"]:
+            elif col in ["Gross Pay", "Net Pay", "Health Ins.", "Other Ded."]:
                 tree.column(col, width=90)
             else:
                 tree.column(col, width=80)
