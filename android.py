@@ -739,7 +739,8 @@ class TransactionsScreen(Screen):
 
     def refresh(self):
         items = [
-            f"{t.name} ({t.transaction_type}, {t.frequency}): {t.amount}"
+            f"{t.name} ({t.transaction_type}, {t.frequency}) "
+            f"{t.category}: {t.amount:+.2f}"
             for t in self.app.calculator.transactions
         ]
         self.view.refresh(items)
@@ -795,7 +796,10 @@ class PaycheckScreen(Screen):
         self.refresh()
 
     def refresh(self):
-        items = [p.job_name for p in self.app.calculator.paychecks]
+        items = [
+            f"{p.job_name} ({p.frequency}) Net: ${p.calculate_pay_amount():.2f}"
+            for p in self.app.calculator.paychecks
+        ]
         self.view.refresh(items)
 
     def add(self):
@@ -883,7 +887,11 @@ class PortfolioScreen(Screen):
         self.refresh()
 
     def refresh(self):
-        items = [f"{h.symbol}: {h.amount}" for h in self.app.calculator.crypto_portfolio.holdings]
+        items = []
+        for h in self.app.calculator.crypto_portfolio.holdings:
+            value = h.get_current_value()
+            txt = f"{h.symbol}: {h.amount} (Value: ${value:.2f})"
+            items.append(txt)
         self.view.refresh(items)
 
     def refresh_prices(self):
@@ -922,6 +930,8 @@ class SettingsScreen(Screen):
         layout.add_widget(Label(text='Settings', color=(1,1,1,1)))
         layout.add_widget(Button(text='Save Data', on_release=lambda x: app.save_data(),
                                  background_normal='', background_color=(0.2,0.2,0.2,1), color=(1,1,1,1)))
+        layout.add_widget(Button(text='Clear Data', on_release=lambda x: app.confirm_clear_data(),
+                                 background_normal='', background_color=(0.5,0.2,0.2,1), color=(1,1,1,1)))
         layout.add_widget(Button(text='Back', on_release=lambda x: setattr(app.sm, 'current', 'calendar'),
                                  background_normal='', background_color=(0.2,0.2,0.2,1), color=(1,1,1,1)))
         self.add_widget(layout)
@@ -984,6 +994,31 @@ class BudgieAndroid(App):
             json.dump(self.calculator.to_dict(), f, indent=2)
         if show_popup:
             self.show_message('Data saved successfully.', title='Saved')
+
+    def confirm_clear_data(self):
+        content = BoxLayout(orientation='vertical')
+        content.add_widget(Label(text='Clear all saved data?'))
+        btn_box = BoxLayout(size_hint_y=0.3)
+        yes_btn = Button(text='Yes', background_normal='', background_color=(0.5,0.2,0.2,1), color=(1,1,1,1))
+        no_btn = Button(text='No', background_normal='', background_color=(0.2,0.2,0.2,1), color=(1,1,1,1))
+        btn_box.add_widget(yes_btn)
+        btn_box.add_widget(no_btn)
+        content.add_widget(btn_box)
+        popup = Popup(title='Confirm', content=content, size_hint=(0.7,0.4))
+        yes_btn.bind(on_release=lambda x: (popup.dismiss(), self.clear_data()))
+        no_btn.bind(on_release=popup.dismiss)
+        popup.open()
+
+    def clear_data(self):
+        self.calculator = BudgetCalculator()
+        try:
+            os.remove(self.data_file)
+        except OSError:
+            pass
+        for screen in self.sm.screens:
+            if hasattr(screen, 'refresh'):
+                screen.refresh()
+        self.show_message('All data cleared.', title='Cleared')
 
     def maybe_auto_save(self):
         # Always auto-save for simplicity
