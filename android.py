@@ -556,10 +556,10 @@ class TransactionItem(BoxLayout, RecycleDataViewBehavior):
     text = StringProperty("")
 
 class TransactionsView(RecycleView):
-    def __init__(self, **kwargs):
+    def __init__(self, viewclass='Label', **kwargs):
         super().__init__(**kwargs)
-        # Use simple labels for each item in the list
-        self.viewclass = 'Label'
+        # Allow different widgets for items (Label by default)
+        self.viewclass = viewclass
         # Ensure vertical layout for list items
         from kivy.uix.recycleboxlayout import RecycleBoxLayout
         self.layout_manager = RecycleBoxLayout(default_size=(None, 40),
@@ -570,9 +570,18 @@ class TransactionsView(RecycleView):
         self.add_widget(self.layout_manager)
         self.refresh([])
 
-    def refresh(self, items):
-        # Ensure text is visible on the dark background by setting the label color
-        self.data = [{'text': i, 'color': (1, 1, 1, 1)} for i in items]
+    def refresh(self, items, callbacks=None):
+        data = []
+        for idx, text in enumerate(items):
+            item = {'text': text, 'color': (1, 1, 1, 1)}
+            if callbacks and idx < len(callbacks) and callbacks[idx]:
+                item.update({
+                    'on_release': callbacks[idx],
+                    'background_normal': '',
+                    'background_color': (0.2, 0.2, 0.2, 1)
+                })
+            data.append(item)
+        self.data = data
 
 class CalendarScreen(Screen):
     def __init__(self, app, **kwargs):
@@ -653,19 +662,22 @@ class CalendarScreen(Screen):
                         else:
                             expense_total += t.amount
                     txt = str(day)
-                    if total != 0:
-                        txt += f"\n${total:+.0f}"
-                    bg = (0.2,0.2,0.2,1)
+                    bg = (0.2, 0.2, 0.2, 1)
+                    if total > 0:
+                        bg = (0.1, 0.6, 0.1, 1)
+                    elif total < 0:
+                        bg = (0.6, 0.1, 0.1, 1)
+                    txt_color = (1, 1, 1, 1)
                     if (day == today.day and self.current_month == today.month and
                             self.current_year == today.year):
-                        bg = (0.1, 0.5, 0.1, 1)
-                    # Increase height for better tap targets
+                        bg = (1.0, 1.0, 0.2, 1)
+                        txt_color = (0, 0, 0, 1)
                     btn = Button(text=txt,
-                                 size_hint_y=None, height=60,
+                                 size_hint_y=None, height=100,
                                  on_release=lambda x, d=day: self.show_day(d),
                                  background_normal='',
                                  background_color=bg,
-                                 color=(1,1,1,1))
+                                 color=txt_color)
                     self.grid.add_widget(btn)
 
         net = income_total - expense_total
@@ -854,9 +866,10 @@ class PaycheckScreen(Screen):
             f"{p.job_name} ({p.frequency}) Net: ${p.calculate_pay_amount():.2f}"
             for p in self.app.calculator.paychecks
         ]
+        callbacks = [lambda x, i=i: self.edit(i) for i in range(len(items))]
         total = sum(p.calculate_pay_amount() for p in self.app.calculator.paychecks)
         self.summary.text = f"Total Net Pay: ${total:.2f}"
-        self.view.refresh(items)
+        self.view.refresh(items, callbacks)
 
     def add(self):
         content = BoxLayout(orientation='vertical')
@@ -888,6 +901,52 @@ class PaycheckScreen(Screen):
         content.add_widget(Button(text='Add', on_release=done,
                                  background_normal='', background_color=(0.2,0.2,0.2,1), color=(1,1,1,1)))
         popup = Popup(title='Add Paycheck', content=content, size_hint=(0.8,0.6))
+        popup.open()
+
+    def edit(self, index):
+        p = self.app.calculator.paychecks[index]
+        content = BoxLayout(orientation='vertical')
+        name = TextInput(text=p.job_name)
+        rate = TextInput(text=str(p.hourly_rate), input_filter='float')
+        hours = TextInput(text=str(p.hours_per_week), input_filter='float')
+        freq = Spinner(text=p.frequency, values=['weekly', 'bi-weekly', 'monthly'])
+        start = TextInput(text=p.start_date.strftime('%Y-%m-%d') if p.start_date else '')
+        content.add_widget(name)
+        content.add_widget(rate)
+        content.add_widget(hours)
+        content.add_widget(freq)
+        content.add_widget(start)
+
+        btn_box = BoxLayout(size_hint_y=0.3)
+
+        def save(instance):
+            try:
+                sdate = datetime.strptime(start.text, '%Y-%m-%d').date() if start.text else None
+                p.job_name = name.text
+                p.hourly_rate = float(rate.text)
+                p.hours_per_week = float(hours.text)
+                p.frequency = freq.text
+                p.start_date = sdate or p.start_date
+                self.app.maybe_auto_save()
+                self.refresh()
+                self.app.sm.get_screen('calendar').update_calendar()
+                popup.dismiss()
+            except ValueError:
+                popup.dismiss()
+
+        def delete(instance):
+            self.app.calculator.remove_paycheck(p)
+            self.app.maybe_auto_save()
+            self.refresh()
+            self.app.sm.get_screen('calendar').update_calendar()
+            popup.dismiss()
+
+        btn_box.add_widget(Button(text='Save', on_release=save,
+                                  background_normal='', background_color=(0.2,0.2,0.2,1), color=(1,1,1,1)))
+        btn_box.add_widget(Button(text='Delete', on_release=delete,
+                                  background_normal='', background_color=(0.5,0.2,0.2,1), color=(1,1,1,1)))
+        content.add_widget(btn_box)
+        popup = Popup(title='Edit Paycheck', content=content, size_hint=(0.8,0.7))
         popup.open()
 
 class SavingsScreen(Screen):
