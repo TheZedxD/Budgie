@@ -71,6 +71,59 @@ class CryptoPortfolio:
             p.add_holding(CryptoHolding.from_dict(h))
         return p
 
+class CryptoPriceService:
+    @staticmethod
+    def fetch_prices(symbols):
+        try:
+            import urllib.request
+            import json
+
+            if not symbols:
+                return {}
+
+            symbol_map = {
+                'BTC': 'bitcoin',
+                'ETH': 'ethereum',
+                'ADA': 'cardano',
+                'DOT': 'polkadot',
+                'LINK': 'chainlink',
+                'LTC': 'litecoin',
+                'BCH': 'bitcoin-cash',
+                'XRP': 'ripple',
+                'DOGE': 'dogecoin',
+                'MATIC': 'matic-network',
+                'SOL': 'solana',
+                'AVAX': 'avalanche-2',
+                'UNI': 'uniswap',
+                'ATOM': 'cosmos',
+                'ALGO': 'algorand'
+            }
+
+            coin_ids = []
+            for symbol in symbols:
+                coin_id = symbol_map.get(symbol.upper(), symbol.lower())
+                coin_ids.append(coin_id)
+
+            if not coin_ids:
+                return {}
+
+            ids_string = ','.join(coin_ids)
+            url = f"https://api.coingecko.com/api/v3/simple/price?ids={ids_string}&vs_currencies=usd"
+
+            with urllib.request.urlopen(url, timeout=10) as response:
+                data = json.loads(response.read().decode())
+
+            prices = {}
+            for i, symbol in enumerate(symbols):
+                coin_id = coin_ids[i]
+                if coin_id in data and 'usd' in data[coin_id]:
+                    prices[symbol.upper()] = data[coin_id]['usd']
+
+            return prices
+
+        except Exception:
+            return {}
+
 class SavingsAccount:
     def __init__(self, name, balance=0.0, interest_rate=0.0):
         self.name = name
@@ -196,6 +249,17 @@ class BudgetCalculator:
     def remove_paycheck(self, p):
         if p in self.paychecks:
             self.paychecks.remove(p)
+
+    def update_crypto_prices(self):
+        if not self.crypto_portfolio.holdings:
+            return
+
+        symbols = [h.symbol for h in self.crypto_portfolio.holdings]
+        prices = CryptoPriceService.fetch_prices(symbols)
+
+        for h in self.crypto_portfolio.holdings:
+            if h.symbol in prices:
+                h.current_price = prices[h.symbol]
 
     # --- Date based helpers copied from app.py ---
     def get_transactions_for_date(self, target_date):
@@ -380,7 +444,7 @@ class CalendarScreen(Screen):
                             expense_total += t.amount
                     txt = str(day)
                     if total != 0:
-                        txt += f"\n${total:.0f}"
+                        txt += f"\n${total:+.0f}"
                     bg = (0.2,0.2,0.2,1)
                     if (day == today.day and self.current_month == today.month and
                             self.current_year == today.year):
@@ -396,7 +460,7 @@ class CalendarScreen(Screen):
         net = income_total - expense_total
         today_str = today.strftime('%Y-%m-%d')
         self.summary.text = (f"Income: ${income_total:.0f}  Expenses: ${expense_total:.0f}  "
-                              f"Net: ${net:.0f}  Today: {today_str}")
+                              f"Net: ${net:+.0f}  Today: {today_str}")
 
     def show_day(self, day):
         selected = date(self.current_year, self.current_month, day)
@@ -404,7 +468,10 @@ class CalendarScreen(Screen):
         content = BoxLayout(orientation='vertical')
         content.add_widget(Label(text=selected.strftime('%Y-%m-%d'), color=(1,1,1,1)))
         for t in items:
-            content.add_widget(Label(text=f"{t.name}: {t.amount}", color=(1,1,1,1)))
+            content.add_widget(Label(text=f"{t.name}: {t.amount:+.2f}", color=(1,1,1,1)))
+
+        daily_total = self.app.calculator.calculate_daily_total(selected)
+        content.add_widget(Label(text=f"Total: ${daily_total:+.2f}", color=(1,1,1,1)))
         add_btn = Button(text='Add Transaction', background_normal='', background_color=(0.2,0.2,0.2,1), color=(1,1,1,1))
         content.add_widget(add_btn)
 
@@ -492,6 +559,8 @@ class PaycheckScreen(Screen):
         layout.add_widget(self.view)
         btn_box = BoxLayout(size_hint_y=0.1)
         btn_box.add_widget(Button(text='Add', on_release=lambda x: self.add(),
+                                  background_normal='', background_color=(0.2,0.2,0.2,1), color=(1,1,1,1)))
+        btn_box.add_widget(Button(text='Refresh', on_release=lambda x: self.refresh_prices(),
                                   background_normal='', background_color=(0.2,0.2,0.2,1), color=(1,1,1,1)))
         btn_box.add_widget(Button(text='Back', on_release=lambda x: setattr(app.sm, 'current', 'calendar'),
                                   background_normal='', background_color=(0.2,0.2,0.2,1), color=(1,1,1,1)))
@@ -585,6 +654,12 @@ class PortfolioScreen(Screen):
         items = [f"{h.symbol}: {h.amount}" for h in self.app.calculator.crypto_portfolio.holdings]
         self.view.refresh(items)
 
+    def refresh_prices(self):
+        if not self.app.calculator.crypto_portfolio.holdings:
+            return
+        self.app.calculator.update_crypto_prices()
+        self.refresh()
+
     def add(self):
         content = BoxLayout(orientation='vertical')
         sym = TextInput(hint_text='Symbol')
@@ -595,6 +670,7 @@ class PortfolioScreen(Screen):
             try:
                 h = CryptoHolding(sym.text, sym.text, float(amt.text))
                 self.app.calculator.crypto_portfolio.add_holding(h)
+                self.app.calculator.update_crypto_prices()
                 self.app.maybe_auto_save()
                 self.refresh()
                 popup.dismiss()

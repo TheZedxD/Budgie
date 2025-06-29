@@ -950,7 +950,7 @@ class CalendarWidget:
                 
                 # Create button text
                 if daily_total != 0:
-                    button_text = f"{day}\n${daily_total:,.0f}"
+                    button_text = f"{day}\n${daily_total:+,.0f}"
                 else:
                     button_text = str(day)
                 
@@ -1016,7 +1016,7 @@ class DayDetailDialog:
         
         daily_total = self.calculator.calculate_daily_total(self.selected_date)
         
-        total_label = ttk.Label(main_frame, text=f"Daily Net Total: ${daily_total:,.2f}",
+        total_label = ttk.Label(main_frame, text=f"Daily Net Total: ${daily_total:+,.2f}",
                                font=("Arial", 11, "bold"))
         total_label.pack(pady=(0, 15))
         
@@ -1321,7 +1321,7 @@ class BudgieApp:
         net = income - expenses
         ttk.Label(self.summary_frame, text="Net:", font=("Arial", 9, "bold")).grid(row=3, column=0, sticky=tk.W)
         net_color = "green" if net >= 0 else "red"
-        self.monthly_net_label = ttk.Label(self.summary_frame, text=f"${net:,.2f}", foreground=net_color)
+        self.monthly_net_label = ttk.Label(self.summary_frame, text=f"${net:+,.2f}", foreground=net_color)
         self.monthly_net_label.grid(row=3, column=1, sticky=tk.W, padx=(10, 0))
     
     def update_crypto_display(self):
