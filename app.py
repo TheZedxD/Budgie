@@ -976,27 +976,52 @@ class CalendarWidget:
                     label.grid(row=row, column=col, padx=1, pady=1, sticky="nsew")
                     self.day_buttons[day] = label
                 else:
-                    # Create button text
-                    button_text = f"{day}\n${daily_total:+,.0f}"
-
-                    button = tk.Button(
+                    # Container for day info and transaction color bars
+                    container = tk.Frame(
                         self.cal_frame,
+                        bg=bg_color,
+                        bd=border_width,
+                        relief=tk.RAISED,
+                    )
+                    container.grid(row=row, column=col, padx=1, pady=1, sticky="nsew")
+
+                    button_text = f"{day}\n${daily_total:+,.0f}"
+                    label = tk.Label(
+                        container,
                         text=button_text,
                         bg=bg_color,
                         fg=text_color,
                         font=("Arial", 9, "bold" if is_today else "normal"),
-                        relief=tk.RAISED,
-                        bd=border_width,
-                        command=lambda d=day: self.day_clicked(d),
-                        cursor="hand2",
-                        activebackground=bg_color,
-                        activeforeground=text_color,
                         wraplength=80,
-                        justify=tk.CENTER
+                        justify=tk.CENTER,
+                        cursor="hand2"
                     )
+                    label.pack(fill=tk.BOTH, expand=True)
+                    label.bind("<Button-1>", lambda e, d=day: self.day_clicked(d))
 
-                    button.grid(row=row, column=col, padx=1, pady=1, sticky="nsew")
-                    self.day_buttons[day] = button
+                    # Canvas showing color-coded transactions
+                    bar_canvas = tk.Canvas(
+                        container,
+                        height=5,
+                        bg=bg_color,
+                        highlightthickness=0
+                    )
+                    bar_canvas.pack(fill=tk.X)
+
+                    if transactions:
+                        bar_width = max(1, int(80 / len(transactions)))
+                        x = 0
+                        for trans in transactions:
+                            color = colors.get(trans.category, '#000000')
+                            bar_canvas.create_rectangle(
+                                x, 0, x + bar_width, 5,
+                                fill=color,
+                                outline=""
+                            )
+                            x += bar_width
+                    bar_canvas.bind("<Button-1>", lambda e, d=day: self.day_clicked(d))
+
+                    self.day_buttons[day] = container
     
     def day_clicked(self, day):
         if self.on_day_click:
@@ -1273,7 +1298,23 @@ class BudgieApp:
         theme = self.theme_manager.get_theme()
         panel.configure(style='TFrame')
 
-        scrollable_frame = panel
+        # Create a scrollable area so large stats sections don't get cut off
+        canvas = tk.Canvas(panel, borderwidth=0, highlightthickness=0,
+                           background=theme['frame_bg'])
+        scrollbar = ttk.Scrollbar(panel, orient="vertical", command=canvas.yview)
+        scroll_frame = ttk.Frame(canvas)
+
+        scroll_frame.bind(
+            "<Configure>",
+            lambda e: canvas.configure(scrollregion=canvas.bbox("all"))
+        )
+        canvas.create_window((0, 0), window=scroll_frame, anchor="nw")
+        canvas.configure(yscrollcommand=scrollbar.set)
+
+        canvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+
+        scrollable_frame = scroll_frame
         
         # Current balance section
         balance_frame = ttk.LabelFrame(scrollable_frame, text="Account Status", padding="10")
