@@ -11,6 +11,7 @@ from kivy.uix.label import Label
 from kivy.uix.textinput import TextInput
 from kivy.uix.popup import Popup
 from kivy.uix.recycleview import RecycleView
+from kivy.uix.spinner import Spinner
 from kivy.uix.recycleview.views import RecycleDataViewBehavior
 from kivy.uix.screenmanager import ScreenManager, Screen
 from kivy.properties import StringProperty
@@ -490,15 +491,20 @@ class CalendarScreen(Screen):
         content = BoxLayout(orientation='vertical')
         name = TextInput(hint_text='Name')
         amount = TextInput(hint_text='Amount', input_filter='float')
+        freq = Spinner(text='one-time',
+                       values=['one-time', 'weekly', 'bi-weekly', 'monthly', 'yearly'])
         content.add_widget(name)
         content.add_widget(amount)
+        content.add_widget(freq)
 
         def done(instance):
             try:
-                t = Transaction(name.text, float(amount.text), 'expense', start_date=selected_date)
+                t = Transaction(name.text, float(amount.text), 'expense',
+                                frequency=freq.text, start_date=selected_date)
                 self.app.calculator.add_transaction(t)
                 self.app.maybe_auto_save()
                 self.update_calendar()
+                self.app.show_message('Transaction added.', title='Added')
                 popup.dismiss()
             except ValueError:
                 popup.dismiss()
@@ -534,14 +540,19 @@ class TransactionsScreen(Screen):
         content = BoxLayout(orientation='vertical')
         name = TextInput(hint_text='Name')
         amount = TextInput(hint_text='Amount', input_filter='float')
+        freq = Spinner(text='one-time',
+                       values=['one-time', 'weekly', 'bi-weekly', 'monthly', 'yearly'])
         content.add_widget(name)
         content.add_widget(amount)
+        content.add_widget(freq)
         def done(instance):
             try:
-                t = Transaction(name.text, float(amount.text), 'expense')
+                t = Transaction(name.text, float(amount.text), 'expense',
+                                frequency=freq.text)
                 self.app.calculator.add_transaction(t)
                 self.app.maybe_auto_save()
                 self.refresh()
+                self.app.show_message('Transaction added.', title='Added')
                 popup.dismiss()
             except ValueError:
                 popup.dismiss()
@@ -580,12 +591,17 @@ class PaycheckScreen(Screen):
         content.add_widget(name)
         content.add_widget(rate)
         content.add_widget(hours)
+        freq = Spinner(text='bi-weekly',
+                       values=['weekly', 'bi-weekly', 'monthly'])
+        content.add_widget(freq)
         def done(instance):
             try:
-                p = Paycheck(name.text, float(rate.text), float(hours.text))
+                p = Paycheck(name.text, float(rate.text), float(hours.text),
+                             frequency=freq.text)
                 self.app.calculator.add_paycheck(p)
                 self.app.maybe_auto_save()
                 self.refresh()
+                self.app.show_message('Paycheck added.', title='Added')
                 popup.dismiss()
             except ValueError:
                 popup.dismiss()
@@ -626,6 +642,7 @@ class SavingsScreen(Screen):
                 self.app.calculator.savings_accounts.append(acc)
                 self.app.maybe_auto_save()
                 self.refresh()
+                self.app.show_message('Account added.', title='Added')
                 popup.dismiss()
             except ValueError:
                 popup.dismiss()
@@ -673,6 +690,7 @@ class PortfolioScreen(Screen):
                 self.app.calculator.update_crypto_prices()
                 self.app.maybe_auto_save()
                 self.refresh()
+                self.app.show_message('Holding added.', title='Added')
                 popup.dismiss()
             except ValueError:
                 popup.dismiss()
@@ -694,6 +712,17 @@ class SettingsScreen(Screen):
         self.add_widget(layout)
 
 class BudgieAndroid(App):
+    def show_message(self, message, title='Info'):
+        content = BoxLayout(orientation='vertical')
+        content.add_widget(Label(text=message))
+        btn = Button(text='OK', size_hint_y=0.3,
+                     background_normal='', background_color=(0.2,0.2,0.2,1),
+                     color=(1,1,1,1))
+        content.add_widget(btn)
+        popup = Popup(title=title, content=content, size_hint=(0.6, 0.4))
+        btn.bind(on_release=popup.dismiss)
+        popup.open()
+
     def build(self):
         Window.clearcolor = (0.1, 0.1, 0.1, 1)
         self.preferences = {}
@@ -735,13 +764,15 @@ class BudgieAndroid(App):
         root.add_widget(nav)
         return root
 
-    def save_data(self):
+    def save_data(self, show_popup=True):
         with open(self.data_file, 'w') as f:
             json.dump(self.calculator.to_dict(), f, indent=2)
+        if show_popup:
+            self.show_message('Data saved successfully.', title='Saved')
 
     def maybe_auto_save(self):
         # Always auto-save for simplicity
-        self.save_data()
+        self.save_data(show_popup=False)
 
 if __name__ == '__main__':
     BudgieAndroid().run()
