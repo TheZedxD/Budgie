@@ -1089,7 +1089,8 @@ class BudgieApp:
         self.calculator = BudgetCalculator()
         self.current_balance = 0.0
         
-        self.data_file = os.path.join(os.getcwd(), "budgie_data.json")
+        data_dir = self.preferences.get('default_data_directory', os.getcwd())
+        self.data_file = os.path.join(data_dir, "budgie_data.json")
         
         self.load_data()
         self.setup_menu()
@@ -1102,6 +1103,7 @@ class BudgieApp:
     
     def on_closing(self):
         self.preferences.set('window_geometry', self.root.geometry())
+        self.maybe_auto_save()
         self.root.destroy()
     
     def on_window_configure(self, event):
@@ -1447,7 +1449,7 @@ class BudgieApp:
             )
             self.calculator.crypto_portfolio.add_holding(holding)
             self.update_crypto_display()  # Update main screen
-            self.save_data()
+            self.maybe_auto_save()
     
     def show_crypto_portfolio(self):
         CryptoPortfolioWindow(self.root, self.calculator, self.preferences, self.theme_manager, self.update_crypto_display, self.save_data)
@@ -1469,7 +1471,7 @@ class BudgieApp:
             )
             self.calculator.add_paycheck(paycheck)
             self.refresh_calendar()
-            self.save_data()
+            self.maybe_auto_save()
     
     def manage_paychecks(self):
         if not self.calculator.paychecks:
@@ -1575,7 +1577,7 @@ class BudgieApp:
                     self.dialog.destroy()
                     self.manage_paychecks()
                     self.refresh_calendar()
-                    self.save_data()
+                    self.maybe_auto_save()
             else:
                 messagebox.showwarning("No Selection", "Please select a paycheck to edit.")
         
@@ -1588,7 +1590,7 @@ class BudgieApp:
                     self.calculator.remove_paycheck(paycheck)
                     tree.delete(selection[0])
                     self.refresh_calendar()
-                    self.save_data()
+                    self.maybe_auto_save()
             else:
                 messagebox.showwarning("No Selection", "Please select a paycheck to delete.")
         
@@ -1721,7 +1723,7 @@ class BudgieApp:
             tree.winfo_toplevel().destroy()
             self.manage_paychecks()
             self.refresh_calendar()
-            self.save_data()
+            self.maybe_auto_save()
     
     def delete_paycheck_from_tree(self, tree):
         """Delete selected paycheck from tree view"""
@@ -1736,7 +1738,7 @@ class BudgieApp:
             self.calculator.remove_paycheck(paycheck)
             tree.delete(selection[0])
             self.refresh_calendar()
-            self.save_data()
+            self.maybe_auto_save()
     
     def add_transaction_dialog(self):
         dialog = TransactionDialog(self.root, "Add Transaction", self.preferences, self.theme_manager)
@@ -1752,7 +1754,7 @@ class BudgieApp:
             )
             self.calculator.add_transaction(trans)
             self.refresh_calendar()
-            self.save_data()
+            self.maybe_auto_save()
     
     def manage_transactions(self):
         if not self.calculator.transactions:
@@ -1829,7 +1831,7 @@ class BudgieApp:
                     dialog.destroy()
                     self.manage_transactions()
                     self.refresh_calendar()
-                    self.save_data()
+                    self.maybe_auto_save()
             else:
                 messagebox.showwarning("No Selection", "Please select a transaction to edit.")
         
@@ -1842,7 +1844,7 @@ class BudgieApp:
                     self.calculator.remove_transaction(trans)
                     tree.delete(selection[0])
                     self.refresh_calendar()
-                    self.save_data()
+                    self.maybe_auto_save()
             else:
                 messagebox.showwarning("No Selection", "Please select a transaction to delete.")
         
@@ -1895,7 +1897,7 @@ class BudgieApp:
             tree.winfo_toplevel().destroy()
             self.manage_transactions()
             self.refresh_calendar()
-            self.save_data()
+            self.maybe_auto_save()
     
     def delete_transaction_from_tree(self, tree):
         """Delete selected transaction from tree view"""
@@ -1910,7 +1912,7 @@ class BudgieApp:
             self.calculator.remove_transaction(trans)
             tree.delete(selection[0])
             self.refresh_calendar()
-            self.save_data()
+            self.maybe_auto_save()
     
     def show_preferences(self):
         PreferencesDialog(self.root, self.preferences, self.theme_manager)
@@ -2145,7 +2147,7 @@ class BudgieApp:
                 self.current_balance = float(balance_var.get())
                 self.balance_label.config(text=f"${self.current_balance:,.2f}")
                 self.update_crypto_display()  # Update net worth
-                self.save_data()
+                self.maybe_auto_save()
                 dialog.destroy()
             except ValueError:
                 messagebox.showerror("Invalid Input", "Please enter a valid number.")
@@ -2172,6 +2174,11 @@ class BudgieApp:
                 json.dump(data, f, indent=2)
         except Exception as e:
             messagebox.showerror("Save Error", f"Could not save data: {str(e)}")
+
+    def maybe_auto_save(self):
+        """Save data if the auto_save preference is enabled."""
+        if self.preferences.get('auto_save', True):
+            self.save_data()
     
     def load_data(self):
         if os.path.exists(self.data_file):
@@ -2227,7 +2234,7 @@ class BudgieApp:
         )
         if filename:
             self.data_file = filename
-            self.save_data()
+            self.maybe_auto_save()
 
 class PreferencesDialog:
     def __init__(self, parent, preferences, theme_manager):
