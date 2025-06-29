@@ -491,16 +491,24 @@ class CalendarScreen(Screen):
         content = BoxLayout(orientation='vertical')
         name = TextInput(hint_text='Name')
         amount = TextInput(hint_text='Amount', input_filter='float')
+        t_type = Spinner(text='expense', values=['expense', 'income'])
         freq = Spinner(text='one-time',
                        values=['one-time', 'weekly', 'bi-weekly', 'monthly', 'yearly'])
+        category = TextInput(hint_text='Category')
         content.add_widget(name)
         content.add_widget(amount)
+        content.add_widget(t_type)
         content.add_widget(freq)
+        content.add_widget(category)
 
         def done(instance):
             try:
-                t = Transaction(name.text, float(amount.text), 'expense',
-                                frequency=freq.text, start_date=selected_date)
+                t = Transaction(name.text,
+                                float(amount.text),
+                                t_type.text,
+                                frequency=freq.text,
+                                start_date=selected_date,
+                                category=category.text or 'other')
                 self.app.calculator.add_transaction(t)
                 self.app.maybe_auto_save()
                 self.update_calendar()
@@ -533,22 +541,32 @@ class TransactionsScreen(Screen):
         self.refresh()
 
     def refresh(self):
-        items = [f"{t.name}: {t.amount}" for t in self.app.calculator.transactions]
+        items = [
+            f"{t.name} ({t.transaction_type}, {t.frequency}): {t.amount}"
+            for t in self.app.calculator.transactions
+        ]
         self.view.refresh(items)
 
     def add(self):
         content = BoxLayout(orientation='vertical')
         name = TextInput(hint_text='Name')
         amount = TextInput(hint_text='Amount', input_filter='float')
+        t_type = Spinner(text='expense', values=['expense', 'income'])
         freq = Spinner(text='one-time',
                        values=['one-time', 'weekly', 'bi-weekly', 'monthly', 'yearly'])
+        category = TextInput(hint_text='Category')
         content.add_widget(name)
         content.add_widget(amount)
+        content.add_widget(t_type)
         content.add_widget(freq)
+        content.add_widget(category)
         def done(instance):
             try:
-                t = Transaction(name.text, float(amount.text), 'expense',
-                                frequency=freq.text)
+                t = Transaction(name.text,
+                                float(amount.text),
+                                t_type.text,
+                                frequency=freq.text,
+                                category=category.text or 'other')
                 self.app.calculator.add_transaction(t)
                 self.app.maybe_auto_save()
                 self.refresh()
