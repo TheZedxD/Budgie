@@ -34,6 +34,14 @@ class CryptoHolding:
     def get_current_value(self):
         return self.amount * self.current_price
 
+    def get_profit_loss(self):
+        return self.get_current_value() - self.get_purchase_value()
+
+    def get_profit_loss_percentage(self):
+        if self.purchase_price > 0:
+            return ((self.current_price - self.purchase_price) / self.purchase_price) * 100
+        return 0.0
+
     def to_dict(self):
         return {
             'symbol': self.symbol,
@@ -56,13 +64,34 @@ class CryptoHolding:
 class CryptoPortfolio:
     def __init__(self):
         self.holdings = []
+        self.last_updated = None
 
     def add_holding(self, holding):
         self.holdings.append(holding)
 
+    def remove_holding(self, holding):
+        if holding in self.holdings:
+            self.holdings.remove(holding)
+
+    def get_total_value(self):
+        return sum(h.get_current_value() for h in self.holdings)
+
+    def get_total_cost(self):
+        return sum(h.get_purchase_value() for h in self.holdings)
+
+    def get_total_profit_loss(self):
+        return self.get_total_value() - self.get_total_cost()
+
+    def get_total_profit_loss_percentage(self):
+        total_cost = self.get_total_cost()
+        if total_cost > 0:
+            return (self.get_total_profit_loss() / total_cost) * 100
+        return 0.0
+
     def to_dict(self):
         return {
-            'holdings': [h.to_dict() for h in self.holdings]
+            'holdings': [h.to_dict() for h in self.holdings],
+            'last_updated': self.last_updated.isoformat() if self.last_updated else None
         }
 
     @classmethod
@@ -70,6 +99,12 @@ class CryptoPortfolio:
         p = cls()
         for h in data.get('holdings', []):
             p.add_holding(CryptoHolding.from_dict(h))
+        last_updated = data.get('last_updated')
+        if last_updated:
+            try:
+                p.last_updated = datetime.fromisoformat(last_updated)
+            except Exception:
+                p.last_updated = None
         return p
 
 class CryptoPriceService:
@@ -174,19 +209,110 @@ class Transaction:
             end_date
         )
 
+class TaxCalculator:
+    @staticmethod
+    def calculate_federal_income_tax(annual_income, filing_status="single", allowances=1):
+        standard_deductions = {
+            "single": 13850,
+            "married_joint": 27700,
+            "married_separate": 13850,
+            "head_of_household": 20800
+        }
+
+        brackets = {
+            "single": [
+                (10275, 0.10),
+                (41775, 0.12),
+                (89450, 0.22),
+                (190750, 0.24),
+                (364200, 0.32),
+                (462550, 0.35),
+                (float('inf'), 0.37)
+            ],
+            "married_joint": [
+                (20550, 0.10),
+                (83350, 0.12),
+                (178850, 0.22),
+                (340100, 0.24),
+                (431900, 0.32),
+                (647850, 0.35),
+                (float('inf'), 0.37)
+            ]
+        }
+
+        if filing_status not in brackets:
+            filing_status = "single"
+
+        standard_deduction = standard_deductions.get(filing_status, 13850)
+        allowance_deduction = allowances * 4300
+        taxable_income = max(0, annual_income - standard_deduction - allowance_deduction)
+
+        tax = 0
+        previous_bracket = 0
+        for bracket_max, rate in brackets[filing_status]:
+            if taxable_income <= previous_bracket:
+                break
+            taxable_in_bracket = min(taxable_income, bracket_max) - previous_bracket
+            tax += taxable_in_bracket * rate
+            previous_bracket = bracket_max
+            if taxable_income <= bracket_max:
+                break
+        return tax
+
+    @staticmethod
+    def calculate_virginia_state_tax(annual_income):
+        brackets = [
+            (3000, 0.02),
+            (5000, 0.03),
+            (17000, 0.05),
+            (float('inf'), 0.0575)
+        ]
+
+        tax = 0
+        previous_bracket = 0
+        for bracket_max, rate in brackets:
+            if annual_income <= previous_bracket:
+                break
+            taxable_in_bracket = min(annual_income, bracket_max) - previous_bracket
+            tax += taxable_in_bracket * rate
+            previous_bracket = bracket_max
+            if annual_income <= bracket_max:
+                break
+        return tax
+
+    @staticmethod
+    def calculate_fica_taxes(gross_pay):
+        ss_wage_base = 160200
+        ss_rate = 0.062
+        medicare_rate = 0.0145
+        additional_medicare_rate = 0.009
+
+        social_security = min(gross_pay, ss_wage_base) * ss_rate
+        medicare = gross_pay * medicare_rate
+        if gross_pay > 200000:
+            medicare += (gross_pay - 200000) * additional_medicare_rate
+        return social_security, medicare
+
 class Paycheck:
     def __init__(self, job_name, hourly_rate, hours_per_week, frequency="bi-weekly",
-                 start_date=None, end_date=None):
+                 start_date=None, end_date=None, filing_status="single", allowances=1,
+                 health_insurance=0.0, other_deductions=0.0):
         self.job_name = job_name
         self.hourly_rate = float(hourly_rate)
         self.hours_per_week = float(hours_per_week)
         self.frequency = frequency
         self.start_date = start_date or datetime.now().date()
         self.end_date = end_date
+        self.filing_status = filing_status
+        self.allowances = int(allowances)
+        self.health_insurance = float(health_insurance)
+        self.other_deductions = float(other_deductions)
         self.id = id(self)
 
     def calculate_gross_pay(self):
-        if self.frequency == "weekly":
+        if self.frequency == "daily":
+            return self.hourly_rate * self.hours_per_week / 5
+        elif self.frequency == "weekly":
             return self.hourly_rate * self.hours_per_week
         elif self.frequency == "bi-weekly":
             return self.hourly_rate * self.hours_per_week * 2
@@ -194,12 +320,58 @@ class Paycheck:
             return self.hourly_rate * self.hours_per_week * 4.33
         return 0
 
+    def calculate_annual_gross(self):
+        gross_per_period = self.calculate_gross_pay()
+        if self.frequency == "daily":
+            return gross_per_period * 260
+        elif self.frequency == "weekly":
+            return gross_per_period * 52
+        elif self.frequency == "bi-weekly":
+            return gross_per_period * 26
+        elif self.frequency == "monthly":
+            return gross_per_period * 12
+        return 0
+
+    def calculate_tax_breakdown(self):
+        annual_gross = self.calculate_annual_gross()
+        gross_per_period = self.calculate_gross_pay()
+        federal_annual = TaxCalculator.calculate_federal_income_tax(
+            annual_gross, self.filing_status, self.allowances)
+        state_annual = TaxCalculator.calculate_virginia_state_tax(annual_gross)
+        ss_annual, medicare_annual = TaxCalculator.calculate_fica_taxes(annual_gross)
+
+        periods_per_year = (
+            260 if self.frequency == "daily" else
+            52 if self.frequency == "weekly" else
+            26 if self.frequency == "bi-weekly" else
+            12
+        )
+
+        breakdown = {
+            'gross_pay': gross_per_period,
+            'federal_tax': federal_annual / periods_per_year,
+            'state_tax': state_annual / periods_per_year,
+            'social_security': ss_annual / periods_per_year,
+            'medicare': medicare_annual / periods_per_year,
+            'health_insurance': self.health_insurance,
+            'other_deductions': self.other_deductions
+        }
+
+        total_deductions = (
+            breakdown['federal_tax'] + breakdown['state_tax'] +
+            breakdown['social_security'] + breakdown['medicare'] +
+            breakdown['health_insurance'] + breakdown['other_deductions']
+        )
+        breakdown['total_deductions'] = total_deductions
+        breakdown['net_pay'] = gross_per_period - total_deductions
+        return breakdown
+
     def calculate_pay_amount(self):
-        return self.calculate_gross_pay()  # simplified without taxes
+        return self.calculate_tax_breakdown()['net_pay']
 
     def to_transaction(self):
         return Transaction(
-            name=f"{self.job_name} Paycheck",
+            name=f"{self.job_name} Paycheck (Net)",
             amount=self.calculate_pay_amount(),
             transaction_type="income",
             frequency=self.frequency,
@@ -215,7 +387,11 @@ class Paycheck:
             'hours_per_week': self.hours_per_week,
             'frequency': self.frequency,
             'start_date': self.start_date.isoformat(),
-            'end_date': self.end_date.isoformat() if self.end_date else None
+            'end_date': self.end_date.isoformat() if self.end_date else None,
+            'filing_status': self.filing_status,
+            'allowances': self.allowances,
+            'health_insurance': self.health_insurance,
+            'other_deductions': self.other_deductions
         }
 
     @classmethod
@@ -227,7 +403,11 @@ class Paycheck:
             data['hours_per_week'],
             data['frequency'],
             datetime.fromisoformat(data['start_date']).date(),
-            end_date
+            end_date,
+            data.get('filing_status', 'single'),
+            data.get('allowances', 1),
+            data.get('health_insurance', 0.0),
+            data.get('other_deductions', 0.0)
         )
 
 class BudgetCalculator:
@@ -251,6 +431,13 @@ class BudgetCalculator:
         if p in self.paychecks:
             self.paychecks.remove(p)
 
+    def add_savings_account(self, acc):
+        self.savings_accounts.append(acc)
+
+    def remove_savings_account(self, acc):
+        if acc in self.savings_accounts:
+            self.savings_accounts.remove(acc)
+
     def update_crypto_prices(self):
         if not self.crypto_portfolio.holdings:
             return
@@ -261,6 +448,7 @@ class BudgetCalculator:
         for h in self.crypto_portfolio.holdings:
             if h.symbol in prices:
                 h.current_price = prices[h.symbol]
+        self.crypto_portfolio.last_updated = datetime.now()
 
     # --- Date based helpers copied from app.py ---
     def get_transactions_for_date(self, target_date):
@@ -315,6 +503,15 @@ class BudgetCalculator:
         total_income = sum(t.amount for t in txns if t.transaction_type == "income")
         total_expenses = sum(t.amount for t in txns if t.transaction_type == "expense")
         return total_income - total_expenses
+
+    def calculate_running_balance(self, start_balance, target_date):
+        current_date = datetime.now().date()
+        balance = start_balance
+        calc_date = current_date
+        while calc_date <= target_date:
+            balance += self.calculate_daily_total(calc_date)
+            calc_date += timedelta(days=1)
+        return balance
 
     def get_calendar_data(self, year, month):
         cal_data = {}
