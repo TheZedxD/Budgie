@@ -2,6 +2,7 @@ import os
 import json
 import calendar
 from datetime import datetime, date, timedelta
+from dateutil.relativedelta import relativedelta
 
 from kivy.app import App
 from kivy.uix.boxlayout import BoxLayout
@@ -356,6 +357,48 @@ class Paycheck:
     def calculate_pay_amount(self):
         return self.calculate_tax_breakdown()['net_pay']
 
+    def upcoming_paydates(self, start=None, end=None):
+        start = start or date.today()
+        if start < self.start_date:
+            start = self.start_date
+        if end is None:
+            end = date(start.year, 12, 31)
+        if self.end_date and self.end_date < end:
+            end = self.end_date
+
+        dates = []
+        current = self.start_date
+
+        # advance to first occurrence on or after start
+        freq = self.frequency
+        while current < start:
+            if freq == "weekly":
+                current += timedelta(weeks=1)
+            elif freq == "bi-weekly":
+                current += timedelta(weeks=2)
+            elif freq == "monthly":
+                current += relativedelta(months=1)
+            elif freq == "daily":
+                current += timedelta(days=1)
+            else:  # one-time
+                break
+
+        while current <= end:
+            if current >= start:
+                dates.append(current)
+            if freq == "weekly":
+                current += timedelta(weeks=1)
+            elif freq == "bi-weekly":
+                current += timedelta(weeks=2)
+            elif freq == "monthly":
+                current += relativedelta(months=1)
+            elif freq == "daily":
+                current += timedelta(days=1)
+            else:
+                break
+
+        return dates
+
     def to_transaction(self):
         return Transaction(
             name=f"{self.job_name} Paycheck (Net)",
@@ -621,13 +664,29 @@ class CalendarScreen(Screen):
         for d in days:
             self.grid.add_widget(Label(text=d, size_hint_y=None, height=30, color=(1,1,1,1)))
 
-        cal = calendar.monthcalendar(self.current_year, self.current_month)
+        first_weekday, num_days = calendar.monthrange(self.current_year, self.current_month)
+        weeks = []
+        week = [0] * first_weekday
+        day_num = 1
+        while day_num <= num_days:
+            week.append(day_num)
+            if len(week) == 7:
+                weeks.append(week)
+                week = []
+            day_num += 1
+        if week:
+            while len(week) < 7:
+                week.append(0)
+            weeks.append(week)
+
+        self.grid.rows = len(weeks) + 1
+
         cal_data = self.app.calculator.get_calendar_data(self.current_year, self.current_month)
 
         income_total = 0
         expense_total = 0
 
-        for week in cal:
+        for week in weeks:
             for day in week:
                 if day == 0:
                     self.grid.add_widget(Label(text=''))
@@ -665,15 +724,19 @@ class CalendarScreen(Screen):
     def show_day(self, day):
         selected = date(self.current_year, self.current_month, day)
         items = self.app.calculator.get_transactions_for_date(selected)
-        content = BoxLayout(orientation='vertical')
-        content.add_widget(Label(text=selected.strftime('%Y-%m-%d'), color=(1,1,1,1)))
+        content = BoxLayout(orientation='vertical', padding=10, spacing=10)
+        content.add_widget(Label(text=selected.strftime('%Y-%m-%d'), color=(1,1,1,1), size_hint_y=None, height=30))
         for t in items:
-            content.add_widget(Label(text=f"{t.name}: {t.amount:+.2f}", color=(1,1,1,1)))
+            content.add_widget(Label(text=f"{t.name}: {t.amount:+.2f}", color=(1,1,1,1), size_hint_y=None, height=30))
 
         daily_total = self.app.calculator.calculate_daily_total(selected)
-        content.add_widget(Label(text=f"Total: ${daily_total:+.2f}", color=(1,1,1,1)))
-        add_btn = Button(text='Add Transaction', background_normal='', background_color=(0.2,0.2,0.2,1), color=(1,1,1,1))
-        content.add_widget(add_btn)
+        content.add_widget(Label(text=f"Total: ${daily_total:+.2f}", color=(1,1,1,1), size_hint_y=None, height=30))
+        btn_box = BoxLayout(size_hint_y=None, height=40, spacing=10)
+        add_btn = Button(text='Add', background_normal='', background_color=(0.2,0.2,0.2,1), color=(1,1,1,1))
+        close_btn = Button(text='Close', background_normal='', background_color=(0.2,0.2,0.2,1), color=(1,1,1,1))
+        btn_box.add_widget(add_btn)
+        btn_box.add_widget(close_btn)
+        content.add_widget(btn_box)
 
         popup = Popup(title='Day Detail', content=content, size_hint=(0.8,0.8))
 
@@ -682,8 +745,7 @@ class CalendarScreen(Screen):
             self.add_transaction(selected)
 
         add_btn.bind(on_release=add_trans)
-        content.add_widget(Button(text='Close', on_release=lambda x: popup.dismiss(),
-                                 background_normal='', background_color=(0.2,0.2,0.2,1), color=(1,1,1,1)))
+        close_btn.bind(on_release=lambda x: popup.dismiss())
         popup.open()
 
     def add_transaction(self, selected_date):
@@ -798,6 +860,7 @@ class TransactionsScreen(Screen):
                 self.app.calculator.add_transaction(t)
                 self.app.maybe_auto_save()
                 self.refresh()
+                self.app.sm.get_screen('calendar').update_calendar()
                 self.app.show_message('Transaction added.', title='Added')
                 popup.dismiss()
             except ValueError:
@@ -830,13 +893,22 @@ class PaycheckScreen(Screen):
         self.add_widget(layout)
         self.refresh()
 
+    def on_pre_enter(self):
+        self.refresh()
+
     def refresh(self):
-        items = [
-            f"{p.start_date.strftime('%Y-%m-%d')} {p.job_name} ({p.frequency}) Net: ${p.calculate_pay_amount():.2f}"
-            for p in self.app.calculator.paychecks
-        ]
-        callbacks = [lambda x, i=i: self.edit(i) for i in range(len(items))]
-        total = sum(p.calculate_pay_amount() for p in self.app.calculator.paychecks)
+        today = date.today()
+        year_end = date(today.year, 12, 31)
+        items = []
+        callbacks = []
+        total = 0
+        for i, p in enumerate(self.app.calculator.paychecks):
+            total += p.calculate_pay_amount()
+            paydates = p.upcoming_paydates(start=today, end=year_end)
+            dates_str = ", ".join(d.strftime("%m/%d") for d in paydates)
+            items.append(f"{p.job_name} ${p.calculate_pay_amount():.2f}: {dates_str}")
+            callbacks.append(lambda x, idx=i: self.edit(idx))
+
         self.summary.text = f"Total Net Pay: ${total:.2f}"
         self.view.refresh(items, callbacks)
 
@@ -863,6 +935,7 @@ class PaycheckScreen(Screen):
                 self.app.calculator.add_paycheck(p)
                 self.app.maybe_auto_save()
                 self.refresh()
+                self.app.sm.get_screen('calendar').update_calendar()
                 self.app.show_message('Paycheck added.', title='Added')
                 popup.dismiss()
             except ValueError:
@@ -933,13 +1006,19 @@ class PortfolioScreen(Screen):
         btn_box = BoxLayout(size_hint_y=0.1)
         btn_box.add_widget(Button(text='Add', on_release=lambda x: self.add(),
                                   background_normal='', background_color=(0.2,0.2,0.2,1), color=(1,1,1,1)))
+        btn_box.add_widget(Button(text='Refresh', on_release=lambda x: self.refresh(),
+                                  background_normal='', background_color=(0.2,0.2,0.2,1), color=(1,1,1,1)))
         btn_box.add_widget(Button(text='Back', on_release=lambda x: setattr(app.sm, 'current', 'calendar'),
                                   background_normal='', background_color=(0.2,0.2,0.2,1), color=(1,1,1,1)))
         layout.add_widget(btn_box)
         self.add_widget(layout)
         self.refresh()
 
+    def on_pre_enter(self):
+        self.refresh()
+
     def refresh(self):
+        self.app.calculator.update_crypto_prices()
         items = []
         total = 0
         for h in self.app.calculator.crypto_portfolio.holdings:
@@ -951,9 +1030,6 @@ class PortfolioScreen(Screen):
         self.view.refresh(items)
 
     def refresh_prices(self):
-        if not self.app.calculator.crypto_portfolio.holdings:
-            return
-        self.app.calculator.update_crypto_prices()
         self.refresh()
 
     def add(self):
