@@ -160,19 +160,6 @@ class CryptoPriceService:
         except Exception:
             return {}
 
-class SavingsAccount:
-    def __init__(self, name, balance=0.0, interest_rate=0.0):
-        self.name = name
-        self.balance = balance
-        self.interest_rate = interest_rate
-        self.id = id(self)
-
-    def to_dict(self):
-        return {'name': self.name, 'balance': self.balance, 'interest_rate': self.interest_rate}
-
-    @classmethod
-    def from_dict(cls, data):
-        return cls(data['name'], data.get('balance', 0.0), data.get('interest_rate', 0.0))
 
 class Transaction:
     def __init__(self, name, amount, transaction_type, frequency="one-time", start_date=None, category="other", end_date=None):
@@ -414,7 +401,6 @@ class BudgetCalculator:
     def __init__(self):
         self.transactions = []
         self.paychecks = []
-        self.savings_accounts = []
         self.crypto_portfolio = CryptoPortfolio()
 
     def add_transaction(self, t):
@@ -431,12 +417,6 @@ class BudgetCalculator:
         if p in self.paychecks:
             self.paychecks.remove(p)
 
-    def add_savings_account(self, acc):
-        self.savings_accounts.append(acc)
-
-    def remove_savings_account(self, acc):
-        if acc in self.savings_accounts:
-            self.savings_accounts.remove(acc)
 
     def update_crypto_prices(self):
         if not self.crypto_portfolio.holdings:
@@ -533,7 +513,6 @@ class BudgetCalculator:
         return {
             'transactions': [t.to_dict() for t in self.transactions],
             'paychecks': [p.to_dict() for p in self.paychecks],
-            'savings_accounts': [a.to_dict() for a in self.savings_accounts],
             'crypto_portfolio': self.crypto_portfolio.to_dict()
         }
 
@@ -544,8 +523,6 @@ class BudgetCalculator:
             c.add_transaction(Transaction.from_dict(t))
         for p in data.get('paychecks', []):
             c.add_paycheck(Paycheck.from_dict(p))
-        for a in data.get('savings_accounts', []):
-            c.savings_accounts.append(SavingsAccount.from_dict(a))
         cp = data.get('crypto_portfolio')
         if cp:
             c.crypto_portfolio = CryptoPortfolio.from_dict(cp)
@@ -768,24 +745,16 @@ class TransactionsScreen(Screen):
         self.refresh()
 
     def refresh(self):
-        today = datetime.now().date()
-        first = date(today.year, today.month, 1)
-        last = date(today.year, today.month, calendar.monthrange(today.year, today.month)[1])
-
         items = []
         income_total = 0
         expense_total = 0
 
-        current = first
-        while current <= last:
-            txns = self.app.calculator.get_all_transactions_for_date(current)
-            for t in txns:
-                items.append(f"{current.strftime('%Y-%m-%d')} {t.name}: {t.amount:+.2f}")
-                if t.transaction_type == 'income':
-                    income_total += t.amount
-                else:
-                    expense_total += t.amount
-            current += timedelta(days=1)
+        for t in self.app.calculator.transactions:
+            items.append(f"{t.start_date.strftime('%Y-%m-%d')} {t.name}: {t.amount:+.2f} ({t.frequency})")
+            if t.transaction_type == 'income':
+                income_total += t.amount
+            else:
+                expense_total += t.amount
 
         net = income_total - expense_total
         self.summary.text = (f"Income: ${income_total:.2f}  Expenses: ${expense_total:.2f}  "
@@ -863,7 +832,7 @@ class PaycheckScreen(Screen):
 
     def refresh(self):
         items = [
-            f"{p.job_name} ({p.frequency}) Net: ${p.calculate_pay_amount():.2f}"
+            f"{p.start_date.strftime('%Y-%m-%d')} {p.job_name} ({p.frequency}) Net: ${p.calculate_pay_amount():.2f}"
             for p in self.app.calculator.paychecks
         ]
         callbacks = [lambda x, i=i: self.edit(i) for i in range(len(items))]
@@ -949,51 +918,6 @@ class PaycheckScreen(Screen):
         popup = Popup(title='Edit Paycheck', content=content, size_hint=(0.8,0.7))
         popup.open()
 
-class SavingsScreen(Screen):
-    def __init__(self, app, **kwargs):
-        super().__init__(**kwargs)
-        self.app = app
-        layout = BoxLayout(orientation='vertical')
-        self.summary = Label(text='', size_hint_y=0.1, color=(1,1,1,1))
-        layout.add_widget(self.summary)
-
-        self.view = TransactionsView(size_hint_y=0.8)
-        layout.add_widget(self.view)
-        btn_box = BoxLayout(size_hint_y=0.1)
-        btn_box.add_widget(Button(text='Add', on_release=lambda x: self.add(),
-                                  background_normal='', background_color=(0.2,0.2,0.2,1), color=(1,1,1,1)))
-        btn_box.add_widget(Button(text='Back', on_release=lambda x: setattr(app.sm, 'current', 'calendar'),
-                                  background_normal='', background_color=(0.2,0.2,0.2,1), color=(1,1,1,1)))
-        layout.add_widget(btn_box)
-        self.add_widget(layout)
-        self.refresh()
-
-    def refresh(self):
-        items = [f"{a.name}: {a.balance}" for a in self.app.calculator.savings_accounts]
-        total = sum(a.balance for a in self.app.calculator.savings_accounts)
-        self.summary.text = f"Total Savings: ${total:.2f}"
-        self.view.refresh(items)
-
-    def add(self):
-        content = BoxLayout(orientation='vertical')
-        name = TextInput(hint_text='Account Name')
-        bal = TextInput(hint_text='Balance', input_filter='float')
-        content.add_widget(name)
-        content.add_widget(bal)
-        def done(instance):
-            try:
-                acc = SavingsAccount(name.text, float(bal.text))
-                self.app.calculator.savings_accounts.append(acc)
-                self.app.maybe_auto_save()
-                self.refresh()
-                self.app.show_message('Account added.', title='Added')
-                popup.dismiss()
-            except ValueError:
-                popup.dismiss()
-        content.add_widget(Button(text='Add', on_release=done,
-                                 background_normal='', background_color=(0.2,0.2,0.2,1), color=(1,1,1,1)))
-        popup = Popup(title='Add Account', content=content, size_hint=(0.8,0.6))
-        popup.open()
 
 class PortfolioScreen(Screen):
     def __init__(self, app, **kwargs):
@@ -1021,7 +945,7 @@ class PortfolioScreen(Screen):
         for h in self.app.calculator.crypto_portfolio.holdings:
             value = h.get_current_value()
             total += value
-            txt = f"{h.symbol}: {h.amount} (Value: ${value:.2f})"
+            txt = f"{h.purchase_date.strftime('%Y-%m-%d')} {h.symbol}: {h.amount} (Value: ${value:.2f})"
             items.append(txt)
         self.summary.text = f"Portfolio Value: ${total:.2f}"
         self.view.refresh(items)
@@ -1100,7 +1024,6 @@ class BudgieAndroid(App):
         self.sm.add_widget(CalendarScreen(self, name='calendar'))
         self.sm.add_widget(TransactionsScreen(self, name='transactions'))
         self.sm.add_widget(PaycheckScreen(self, name='paychecks'))
-        self.sm.add_widget(SavingsScreen(self, name='savings'))
         self.sm.add_widget(PortfolioScreen(self, name='portfolio'))
         self.sm.add_widget(SettingsScreen(self, name='settings'))
 
@@ -1114,14 +1037,13 @@ class BudgieAndroid(App):
 
         nav = BoxLayout(size_hint_y=0.08)
         def add_nav(text, screen):
-            nav.add_widget(Button(text=text, size_hint_x=0.16,
+            nav.add_widget(Button(text=text, size_hint_x=0.2,
                                   on_release=lambda x: setattr(self.sm, 'current', screen),
                                   background_normal='', background_color=(0.2,0.2,0.2,1), color=(1,1,1,1)))
 
         add_nav('Home', 'calendar')
         add_nav('Trans', 'transactions')
         add_nav('Pay', 'paychecks')
-        add_nav('Save', 'savings')
         add_nav('Crypto', 'portfolio')
         add_nav('Settings', 'settings')
 
