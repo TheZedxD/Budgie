@@ -638,6 +638,9 @@ class CalendarScreen(Screen):
 
         self.add_widget(layout)
         self.update_calendar()
+        # Initialize selected month/year in the parent app
+        self.app.selected_year = self.current_year
+        self.app.selected_month = self.current_month
 
     def _update_summary_size(self, instance, size):
         instance.text_size = (instance.width, None)
@@ -652,6 +655,8 @@ class CalendarScreen(Screen):
         else:
             self.current_month -= 1
         self.update_calendar()
+        self.app.selected_year = self.current_year
+        self.app.selected_month = self.current_month
 
     def next_month(self):
         if self.current_month == 12:
@@ -660,9 +665,13 @@ class CalendarScreen(Screen):
         else:
             self.current_month += 1
         self.update_calendar()
+        self.app.selected_year = self.current_year
+        self.app.selected_month = self.current_month
 
     def update_calendar(self):
         self.grid.clear_widgets()
+        self.app.selected_year = self.current_year
+        self.app.selected_month = self.current_month
         month_name = calendar.month_name[self.current_month]
         self.month_label.text = f"{month_name} {self.current_year}"
 
@@ -824,12 +833,21 @@ class TransactionsScreen(Screen):
         income_total = 0
         expense_total = 0
 
-        for t in self.app.calculator.transactions:
-            items.append(f"{t.start_date.strftime('%Y-%m-%d')} {t.name}: {t.amount:+.2f} ({t.frequency})")
-            if t.transaction_type == 'income':
-                income_total += t.amount
-            else:
-                expense_total += t.amount
+        year = self.app.selected_year
+        month = self.app.selected_month
+        month_start = date(year, month, 1)
+        month_end = date(year, month, calendar.monthrange(year, month)[1])
+
+        current_day = month_start
+        while current_day <= month_end:
+            txns = self.app.calculator.get_transactions_for_date(current_day)
+            for t in txns:
+                items.append(f"{current_day.strftime('%Y-%m-%d')} {t.name}: {t.amount:+.2f} ({t.frequency})")
+                if t.transaction_type == 'income':
+                    income_total += t.amount
+                else:
+                    expense_total += t.amount
+            current_day += timedelta(days=1)
 
         net = income_total - expense_total
         self.summary.text = (f"Income: ${income_total:.2f}  Expenses: ${expense_total:.2f}  "
@@ -913,10 +931,11 @@ class PaycheckScreen(Screen):
         self.refresh()
 
     def refresh(self):
-        today = date.today()
-        month_start = date(today.year, today.month, 1)
-        month_end = date(today.year, today.month,
-                         calendar.monthrange(today.year, today.month)[1])
+        year = self.app.selected_year
+        month = self.app.selected_month
+        month_start = date(year, month, 1)
+        month_end = date(year, month,
+                         calendar.monthrange(year, month)[1])
 
         entries = []
         total = 0
@@ -1128,6 +1147,10 @@ class BudgieAndroid(App):
                 self.calculator = BudgetCalculator()
         else:
             self.calculator = BudgetCalculator()
+
+        now = datetime.now()
+        self.selected_year = now.year
+        self.selected_month = now.month
 
         self.sm = ScreenManager()
         self.sm.add_widget(CalendarScreen(self, name='calendar'))
