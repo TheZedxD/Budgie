@@ -612,7 +612,9 @@ class CalendarScreen(Screen):
 
         layout = BoxLayout(orientation='vertical')
 
-        self.summary = Label(text='', size_hint_y=0.1, color=(1,1,1,1))
+        self.summary = Label(text='', size_hint_y=None, color=(1,1,1,1),
+                             halign='center', valign='middle')
+        self.summary.bind(size=self._update_summary_size, texture_size=self._update_summary_height)
         layout.add_widget(self.summary)
 
         header = BoxLayout(size_hint_y=0.1)
@@ -636,6 +638,12 @@ class CalendarScreen(Screen):
 
         self.add_widget(layout)
         self.update_calendar()
+
+    def _update_summary_size(self, instance, size):
+        instance.text_size = (instance.width, None)
+
+    def _update_summary_height(self, instance, size):
+        instance.height = size[1]
 
     def prev_month(self):
         if self.current_month == 1:
@@ -718,8 +726,10 @@ class CalendarScreen(Screen):
 
         net = income_total - expense_total
         today_str = today.strftime('%Y-%m-%d')
-        self.summary.text = (f"Income: ${income_total:.0f}  Expenses: ${expense_total:.0f}  "
-                              f"Net: ${net:+.0f}  Today: {today_str}")
+        self.summary.text = (
+            f"Income: ${income_total:.0f}  Expenses: ${expense_total:.0f}\n"
+            f"Net: ${net:+.0f}  Today: {today_str}"
+        )
 
     def show_day(self, day):
         selected = date(self.current_year, self.current_month, day)
@@ -790,7 +800,10 @@ class TransactionsScreen(Screen):
         layout = BoxLayout(orientation='vertical')
 
         # Information label shown above the list
-        self.summary = Label(text='', size_hint_y=0.1, color=(1,1,1,1))
+        self.summary = Label(text='', size_hint_y=None, color=(1,1,1,1),
+                             halign='center', valign='middle')
+        self.summary.bind(size=lambda i, s: i.setter('text_size')(i, (i.width, None)),
+                           texture_size=lambda i, s: i.setter('height')(i, s[1]))
         layout.add_widget(self.summary)
 
         self.view = TransactionsView(size_hint_y=0.8)
@@ -876,7 +889,10 @@ class PaycheckScreen(Screen):
         self.app = app
         layout = BoxLayout(orientation='vertical')
         # Show paycheck summary above the list
-        self.summary = Label(text='', size_hint_y=0.1, color=(1,1,1,1))
+        self.summary = Label(text='', size_hint_y=None, color=(1,1,1,1),
+                             halign='center', valign='middle')
+        self.summary.bind(size=lambda i, s: setattr(i, 'text_size', (i.width, None)),
+                           texture_size=lambda i, s: setattr(i, 'height', s[1]))
         layout.add_widget(self.summary)
 
         self.view = TransactionsView(size_hint_y=0.8)
@@ -898,16 +914,26 @@ class PaycheckScreen(Screen):
 
     def refresh(self):
         today = date.today()
-        year_end = date(today.year, 12, 31)
-        items = []
-        callbacks = []
+        month_start = date(today.year, today.month, 1)
+        month_end = date(today.year, today.month,
+                         calendar.monthrange(today.year, today.month)[1])
+
+        entries = []
         total = 0
+
         for i, p in enumerate(self.app.calculator.paychecks):
-            total += p.calculate_pay_amount()
-            paydates = p.upcoming_paydates(start=today, end=year_end)
-            dates_str = ", ".join(d.strftime("%m/%d") for d in paydates)
-            items.append(f"{p.job_name} ${p.calculate_pay_amount():.2f}: {dates_str}")
-            callbacks.append(lambda x, idx=i: self.edit(idx))
+            paydates = p.upcoming_paydates(start=month_start, end=month_end)
+            for pd in paydates:
+                total += p.calculate_pay_amount()
+                entries.append((pd,
+                                f"{pd.strftime('%m/%d')} {p.job_name}: ${p.calculate_pay_amount():.2f}",
+                                lambda x, idx=i: self.edit(idx)))
+
+        # Sort entries by date
+        entries.sort(key=lambda e: e[0])
+
+        items = [e[1] for e in entries]
+        callbacks = [e[2] for e in entries]
 
         self.summary.text = f"Total Net Pay: ${total:.2f}"
         self.view.refresh(items, callbacks)
@@ -998,7 +1024,10 @@ class PortfolioScreen(Screen):
         self.app = app
         layout = BoxLayout(orientation='vertical')
         # Show portfolio total
-        self.summary = Label(text='', size_hint_y=0.1, color=(1,1,1,1))
+        self.summary = Label(text='', size_hint_y=None, color=(1,1,1,1),
+                             halign='center', valign='middle', font_size='18sp')
+        self.summary.bind(size=lambda i, s: setattr(i, 'text_size', (i.width, None)),
+                           texture_size=lambda i, s: setattr(i, 'height', s[1]))
         layout.add_widget(self.summary)
 
         self.view = TransactionsView(size_hint_y=0.8)
@@ -1021,12 +1050,16 @@ class PortfolioScreen(Screen):
         self.app.calculator.update_crypto_prices()
         items = []
         total = 0
+
         for h in self.app.calculator.crypto_portfolio.holdings:
             value = h.get_current_value()
             total += value
-            txt = f"{h.purchase_date.strftime('%Y-%m-%d')} {h.symbol}: {h.amount} (Value: ${value:.2f})"
+            txt = (
+                f"{h.symbol} - {h.amount} @ ${h.current_price:.2f} = ${value:.2f}"
+            )
             items.append(txt)
-        self.summary.text = f"Portfolio Value: ${total:.2f}"
+
+        self.summary.text = f"Total Portfolio Value: ${total:.2f}"
         self.view.refresh(items)
 
     def refresh_prices(self):

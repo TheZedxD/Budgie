@@ -865,7 +865,8 @@ class CalendarWidget:
         # Configure grid weights for proper resizing
         for i in range(7):  # 7 columns (days of week)
             self.cal_frame.columnconfigure(i, weight=1, minsize=80)
-        for i in range(7):  # 6 weeks max + header row
+        # Preconfigure maximum possible rows (header + up to 6 weeks)
+        for i in range(7):
             self.cal_frame.rowconfigure(i, weight=1, minsize=60)
         
         self.day_buttons = {}
@@ -912,6 +913,15 @@ class CalendarWidget:
         is_dark_theme = self.preferences.get('theme', 'light') == 'dark'
         
         cal = calendar.monthcalendar(self.current_year, self.current_month)
+        num_weeks = len(cal)
+
+        # Adjust row configuration so there is no extra spacing when fewer than
+        # 6 weeks are displayed
+        for i in range(1, 7):
+            if i <= num_weeks:
+                self.cal_frame.rowconfigure(i, weight=1, minsize=60)
+            else:
+                self.cal_frame.rowconfigure(i, weight=0, minsize=0)
         
         today = datetime.now().date()
         is_current_month = (self.current_year == today.year and self.current_month == today.month)
