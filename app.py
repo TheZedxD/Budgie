@@ -939,7 +939,7 @@ class CalendarWidget:
                 transactions = daily_data['transactions']
                 
                 is_today = is_current_month and day == today.day
-                
+
                 # Determine colors based on theme and transaction status
                 if is_today:
                     # Today gets special highlighting
@@ -949,7 +949,7 @@ class CalendarWidget:
                     border_width = 3
                 else:
                     border_width = 1
-                    
+
                     if is_dark_theme:
                         # Dark theme colors
                         if daily_total > 0:
@@ -974,14 +974,25 @@ class CalendarWidget:
                             bg_color = colors.get('neutral_day', '#F5F5F5')
                             text_color = theme['fg']
                         border_color = theme['border_color']
-                
+
+                # Outline color based on theme and whether this is today
+                outline_color = '#FFFFFF' if is_dark_theme else '#000000'
+                if is_today:
+                    outline_color = theme['accent']
+                    outline_width = 2
+                else:
+                    outline_width = 1
+
                 if not transactions:
                     label = tk.Label(
                         self.cal_frame,
                         text=str(day),
                         bg=theme['frame_bg'],
                         fg=theme['fg'],
-                        relief=tk.FLAT
+                        relief=tk.FLAT,
+                        highlightbackground=outline_color,
+                        highlightcolor=outline_color,
+                        highlightthickness=outline_width,
                     )
                     label.grid(row=row, column=col, padx=1, pady=1, sticky="nsew")
                     self.day_buttons[day] = label
@@ -992,6 +1003,9 @@ class CalendarWidget:
                         bg=bg_color,
                         bd=border_width,
                         relief=tk.RAISED,
+                        highlightbackground=outline_color,
+                        highlightcolor=outline_color,
+                        highlightthickness=outline_width,
                     )
                     container.grid(row=row, column=col, padx=1, pady=1, sticky="nsew")
 
@@ -1280,7 +1294,8 @@ class BudgieApp:
         main_container.grid_rowconfigure(0, weight=1)     # Full height
         
         # Left panel with fixed width (no resizing)
-        left_frame = ttk.Frame(main_container, width=320)
+        # Slightly narrower left panel so divider appears more to the left
+        left_frame = ttk.Frame(main_container, width=280)
         left_frame.grid(row=0, column=0, sticky="nsew", padx=(0, 5))
         left_frame.grid_propagate(False)  # Maintain fixed width
         
