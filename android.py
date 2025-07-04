@@ -638,8 +638,17 @@ class CalendarScreen(Screen):
                                  color=(1,1,1,1)))
         layout.add_widget(header)
 
-        # Larger grid so days are easier to tap
-        self.grid = GridLayout(cols=7, size_hint_y=0.8)
+        # Grid for the calendar with square cells
+        self.cell_size = 80
+        self.grid = GridLayout(
+            cols=7,
+            size_hint=(None, None),
+            row_force_default=True,
+            col_force_default=True,
+            row_default_height=self.cell_size,
+            col_default_width=self.cell_size,
+        )
+        self._update_grid_size()
         layout.add_widget(self.grid)
 
         self.add_widget(layout)
@@ -653,6 +662,10 @@ class CalendarScreen(Screen):
 
     def _update_summary_height(self, instance, size):
         instance.height = size[1]
+
+    def _update_grid_size(self):
+        self.grid.width = self.cell_size * 7
+        self.grid.height = self.cell_size * self.grid.rows
 
     def prev_month(self):
         if self.current_month == 1:
@@ -704,6 +717,7 @@ class CalendarScreen(Screen):
             weeks.append(week)
 
         self.grid.rows = len(weeks) + 1
+        self._update_grid_size()
 
         cal_data = self.app.calculator.get_calendar_data(self.current_year, self.current_month)
 
@@ -713,7 +727,9 @@ class CalendarScreen(Screen):
         for week in weeks:
             for day in week:
                 if day == 0:
-                    self.grid.add_widget(Label(text=''))
+                    self.grid.add_widget(
+                        Label(text='', size_hint=(None, None), size=(self.cell_size, self.cell_size))
+                    )
                 else:
                     total = cal_data.get(day, {}).get('total', 0)
                     for t in cal_data.get(day, {}).get('transactions', []):
@@ -732,13 +748,16 @@ class CalendarScreen(Screen):
                             self.current_year == today.year):
                         bg = (1.0, 1.0, 0.2, 1)
                         txt_color = (0, 0, 0, 1)
-                    btn = Button(text=f'[u][b]{txt}[/b][/u]',
-                                 markup=True,
-                                 size_hint_y=None, height=100,
-                                 on_release=lambda x, d=day: self.show_day(d),
-                                 background_normal='',
-                                 background_color=bg,
-                                 color=txt_color)
+                    btn = Button(
+                        text=f'[u][b]{txt}[/b][/u]',
+                        markup=True,
+                        size_hint=(None, None),
+                        size=(self.cell_size, self.cell_size),
+                        on_release=lambda x, d=day: self.show_day(d),
+                        background_normal='',
+                        background_color=bg,
+                        color=txt_color,
+                    )
                     self.grid.add_widget(btn)
 
         net = income_total - expense_total

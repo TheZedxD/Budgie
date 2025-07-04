@@ -870,11 +870,12 @@ class CalendarWidget:
             label.grid(row=0, column=i, padx=1, pady=2, sticky="ew")
         
         # Configure grid weights for proper resizing
+        cell_size = 80
         for i in range(7):  # 7 columns (days of week)
-            self.cal_frame.columnconfigure(i, weight=1, minsize=80)
+            self.cal_frame.columnconfigure(i, weight=1, minsize=cell_size)
         # Preconfigure maximum possible rows (header + up to 6 weeks)
         for i in range(7):
-            self.cal_frame.rowconfigure(i, weight=1, minsize=60)
+            self.cal_frame.rowconfigure(i, weight=1, minsize=cell_size)
         
         self.day_buttons = {}
     
@@ -937,9 +938,10 @@ class CalendarWidget:
 
         # Adjust row configuration so there is no extra spacing when fewer than
         # 6 weeks are displayed
+        cell_size = 80
         for i in range(1, 7):
             if i <= num_weeks:
-                self.cal_frame.rowconfigure(i, weight=1, minsize=60)
+                self.cal_frame.rowconfigure(i, weight=1, minsize=cell_size)
             else:
                 self.cal_frame.rowconfigure(i, weight=0, minsize=0)
         
@@ -1004,6 +1006,7 @@ class CalendarWidget:
                     outline_width = 1
 
                 # Unified container for each day to keep sizes consistent
+                container_size = 80
                 container = tk.Frame(
                     self.cal_frame,
                     bg=bg_color if transactions else theme['frame_bg'],
@@ -1012,8 +1015,8 @@ class CalendarWidget:
                     highlightbackground=outline_color,
                     highlightcolor=outline_color,
                     highlightthickness=outline_width,
-                    width=80,
-                    height=60,
+                    width=container_size,
+                    height=container_size,
                 )
                 container.grid(row=row, column=col, padx=1, pady=1, sticky="nsew")
                 container.grid_propagate(False)
@@ -1031,7 +1034,7 @@ class CalendarWidget:
                     bg=bg_color if transactions else theme['frame_bg'],
                     fg=fg_color,
                     font=("Arial", 9, "bold underline"),
-                    wraplength=80,
+                    wraplength=container_size,
                     justify=tk.CENTER,
                     cursor="hand2" if transactions else "arrow",
                 )
@@ -1048,7 +1051,7 @@ class CalendarWidget:
                     )
                     bar_canvas.pack(fill=tk.X)
 
-                    bar_width = max(1, int(80 / len(transactions)))
+                    bar_width = max(1, int(container_size / len(transactions)))
                     x = 0
                     for trans in transactions:
                         color = colors.get(trans.category, '#000000')
