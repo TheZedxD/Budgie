@@ -3749,9 +3749,19 @@ class MonthlyAnalyzerWindow:
         # Draw charts after the window is displayed and keep them centered on resize
         self.dialog.after(100, self.update_analysis)
         self.resize_job = None
+        self.last_size = (self.dialog.winfo_width(), self.dialog.winfo_height())
         self.dialog.bind("<Configure>", self.on_resize)
 
     def on_resize(self, event):
+        # Only handle resize events from the toplevel window itself
+        if event.widget is not self.dialog:
+            return
+
+        new_size = (event.width, event.height)
+        if new_size == self.last_size:
+            return
+        self.last_size = new_size
+
         if self.resize_job:
             self.dialog.after_cancel(self.resize_job)
         # Debounce resize events to avoid excessive redraws
