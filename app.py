@@ -1312,8 +1312,8 @@ class BudgieApp:
         main_container.grid_rowconfigure(0, weight=1)     # Full height
         
         # Left panel with fixed width (no resizing)
-        # Slightly narrower left panel so divider appears more to the left
-        left_frame = ttk.Frame(main_container, width=280)
+        # Reduced width so the calendar area has more room
+        left_frame = ttk.Frame(main_container, width=220)
         left_frame.grid(row=0, column=0, sticky="nsew", padx=(0, 5))
         left_frame.grid_propagate(False)  # Maintain fixed width
         
