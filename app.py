@@ -3906,10 +3906,11 @@ class MonthlyAnalyzerWindow:
     
     def create_bar_chart(self, parent, category_data):
         """Create an enhanced bar chart for expense categories"""
-        # Create canvas for chart
+        # Create canvas for chart and make sure dimensions are available
         canvas = tk.Canvas(parent, height=450, bg='white')
         canvas.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
-        
+        canvas.update_idletasks()
+
         # Sort categories by amount
         sorted_categories = sorted(category_data.items(), key=lambda x: x[1], reverse=True)
         
@@ -3917,7 +3918,7 @@ class MonthlyAnalyzerWindow:
             return
         
         # Chart dimensions
-        canvas_width = canvas.winfo_reqwidth() or 800
+        canvas_width = canvas.winfo_width() or 800
         chart_width = canvas_width - 100
         chart_height = 350
         margin_left = 80
@@ -3926,6 +3927,8 @@ class MonthlyAnalyzerWindow:
         max_amount = max(category_data.values())
         bar_width = min(60, (chart_width - margin_left) // len(sorted_categories))
         bar_spacing = 10
+        total_bar_width = len(sorted_categories) * (bar_width + bar_spacing) - bar_spacing
+        start_x = margin_left + max(0, (chart_width - margin_left - total_bar_width) // 2)
         
         colors = self.preferences.get('colors', {})
         
@@ -3939,7 +3942,7 @@ class MonthlyAnalyzerWindow:
         
         # Draw bars with enhanced styling
         for i, (category, amount) in enumerate(sorted_categories):
-            x = margin_left + i * (bar_width + bar_spacing)
+            x = start_x + i * (bar_width + bar_spacing)
             bar_height = (amount / max_amount) * (chart_height - margin_bottom) if max_amount > 0 else 0
             y = chart_height - margin_bottom - bar_height
             
@@ -3983,9 +3986,13 @@ class MonthlyAnalyzerWindow:
         if not category_data:
             return
         
-        # Chart dimensions
-        center_x, center_y = 250, 225
-        radius = 120
+        # Chart dimensions based on canvas size
+        canvas.update_idletasks()
+        canvas_width = canvas.winfo_width() or 500
+        canvas_height = canvas.winfo_height() or 450
+        center_x, center_y = canvas_width / 2, canvas_height / 2
+        radius = min(center_x, center_y) - 150
+        radius = max(80, radius)
         
         total_amount = sum(category_data.values())
         colors = self.preferences.get('colors', {})
@@ -3993,6 +4000,7 @@ class MonthlyAnalyzerWindow:
         # Calculate angles for each slice
         start_angle = 0
         legend_y = 50
+        legend_x = center_x + radius + 30
         
         sorted_categories = sorted(category_data.items(), key=lambda x: x[1], reverse=True)
         
@@ -4021,11 +4029,11 @@ class MonthlyAnalyzerWindow:
                                  font=("Arial", 9, "bold"), fill="white")
             
             # Draw legend
-            legend_x = 550
-            canvas.create_rectangle(legend_x, legend_y + i * 25, legend_x + 15, 
+            adj_legend_x = min(legend_x, canvas_width - 160)
+            canvas.create_rectangle(adj_legend_x, legend_y + i * 25, adj_legend_x + 15,
                                   legend_y + i * 25 + 15, fill=color, outline='black')
-            canvas.create_text(legend_x + 25, legend_y + i * 25 + 7, 
-                              text=f"{category.title()}: ${amount:.0f} ({percentage:.1f}%)", 
+            canvas.create_text(adj_legend_x + 25, legend_y + i * 25 + 7,
+                              text=f"{category.title()}: ${amount:.0f} ({percentage:.1f}%)",
                               font=("Arial", 10), anchor="w")
             
             start_angle += slice_angle
@@ -4042,6 +4050,7 @@ class MonthlyAnalyzerWindow:
         """Create future balance projections for next 12 months"""
         canvas = tk.Canvas(self.projections_frame, height=450, bg='white')
         canvas.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
+        canvas.update_idletasks()
         
         # Get current balance from main app
         current_balance = 0
@@ -4068,8 +4077,8 @@ class MonthlyAnalyzerWindow:
                     current_date = date(current_date.year, current_date.month + 1, 1)
         
         # Chart dimensions
-        chart_width = 700
-        chart_height = 350
+        chart_width = canvas.winfo_width() or 700
+        chart_height = canvas.winfo_height() or 350
         margin = 80
         
         if len(projections) < 2:
@@ -4149,6 +4158,7 @@ class MonthlyAnalyzerWindow:
         """Create 5-year financial outlook line graph"""
         canvas = tk.Canvas(self.outlook_frame, height=450, bg='white')
         canvas.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
+        canvas.update_idletasks()
         
         # Get current balance from main app
         current_balance = 0
@@ -4175,8 +4185,8 @@ class MonthlyAnalyzerWindow:
                     current_date = date(current_date.year, current_date.month + 1, 1)
         
         # Chart dimensions
-        chart_width = 800
-        chart_height = 350
+        chart_width = canvas.winfo_width() or 800
+        chart_height = canvas.winfo_height() or 350
         margin = 80
         
         if len(projections) < 2:
@@ -4267,33 +4277,37 @@ class MonthlyAnalyzerWindow:
         """Create income vs expenses comparison chart"""
         canvas = tk.Canvas(self.overview_frame, height=400, bg='white')
         canvas.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
+        canvas.update_idletasks()
         
         # Chart dimensions
-        chart_width = 600
-        chart_height = 350
+        chart_width = canvas.winfo_width() or 600
+        chart_height = canvas.winfo_height() or 350
         margin = 100
         
         max_amount = max(income, expenses, 1)  # Avoid division by zero
         bar_width = 80
+        spacing = 80
+        income_x = chart_width/2 - bar_width - spacing/2
+        expense_x = chart_width/2 + spacing/2
         
         # Income bar
         income_height = (income / max_amount) * (chart_height - margin) if max_amount > 0 else 0
         income_y = chart_height - income_height
-        canvas.create_rectangle(150, income_y, 150 + bar_width, chart_height, 
+        canvas.create_rectangle(income_x, income_y, income_x + bar_width, chart_height,
                               fill='#4CAF50', outline='black', width=2)
-        canvas.create_text(150 + bar_width/2, income_y - 10, text=f"${income:,.0f}", 
+        canvas.create_text(income_x + bar_width/2, income_y - 10, text=f"${income:,.0f}",
                          font=("Arial", 12, "bold"), anchor="s")
-        canvas.create_text(150 + bar_width/2, chart_height + 20, text="Income", 
+        canvas.create_text(income_x + bar_width/2, chart_height + 20, text="Income",
                          font=("Arial", 12, "bold"), anchor="n")
         
         # Expenses bar
         expense_height = (expenses / max_amount) * (chart_height - margin) if max_amount > 0 else 0
         expense_y = chart_height - expense_height
-        canvas.create_rectangle(350, expense_y, 350 + bar_width, chart_height, 
+        canvas.create_rectangle(expense_x, expense_y, expense_x + bar_width, chart_height,
                               fill='#F44336', outline='black', width=2)
-        canvas.create_text(350 + bar_width/2, expense_y - 10, text=f"${expenses:,.0f}", 
+        canvas.create_text(expense_x + bar_width/2, expense_y - 10, text=f"${expenses:,.0f}",
                          font=("Arial", 12, "bold"), anchor="s")
-        canvas.create_text(350 + bar_width/2, chart_height + 20, text="Expenses", 
+        canvas.create_text(expense_x + bar_width/2, chart_height + 20, text="Expenses",
                          font=("Arial", 12, "bold"), anchor="n")
         
         # Net amount
