@@ -623,8 +623,14 @@ class CalendarScreen(Screen):
                                  background_normal='',
                                  background_color=(0.2, 0.2, 0.2, 1),
                                  color=(1, 1, 1, 1)))
+
+        center_box = BoxLayout()
         self.month_label = Label(text='', color=(1,1,1,1))
-        header.add_widget(self.month_label)
+        self.today_label = Label(text='', color=(1,1,1,1), font_size='12sp')
+        center_box.add_widget(self.month_label)
+        center_box.add_widget(self.today_label)
+        header.add_widget(center_box)
+
         header.add_widget(Button(text='>', size_hint_x=0.15,
                                  on_release=lambda x: self.next_month(),
                                  background_normal='',
@@ -674,6 +680,7 @@ class CalendarScreen(Screen):
         self.app.selected_month = self.current_month
         month_name = calendar.month_name[self.current_month]
         self.month_label.text = f"{month_name} {self.current_year}"
+        self.today_label.text = date.today().strftime('%Y-%m-%d')
 
         today = date.today()
 
@@ -725,7 +732,8 @@ class CalendarScreen(Screen):
                             self.current_year == today.year):
                         bg = (1.0, 1.0, 0.2, 1)
                         txt_color = (0, 0, 0, 1)
-                    btn = Button(text=txt,
+                    btn = Button(text=f'[u][b]{txt}[/b][/u]',
+                                 markup=True,
                                  size_hint_y=None, height=100,
                                  on_release=lambda x, d=day: self.show_day(d),
                                  background_normal='',

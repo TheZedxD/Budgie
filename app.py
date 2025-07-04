@@ -834,12 +834,19 @@ class CalendarWidget:
         
         ttk.Button(nav_frame, text="◀ Prev", command=self.previous_month).pack(side=tk.LEFT)
         
-        # Center frame for month display
+        # Center frame for month display and today's date
         center_frame = ttk.Frame(nav_frame)
         center_frame.pack(side=tk.LEFT, expand=True, fill=tk.X)
-        
-        self.month_label = ttk.Label(center_frame, style='Header.TLabel')
-        self.month_label.pack(expand=True)
+
+        labels_frame = ttk.Frame(center_frame)
+        labels_frame.pack(expand=True)
+
+        self.month_label = ttk.Label(labels_frame, style='Header.TLabel')
+        self.month_label.pack(side=tk.LEFT)
+
+        # Small label showing today's date
+        self.today_label = tk.Label(labels_frame)
+        self.today_label.pack(side=tk.LEFT, padx=(10, 0))
         
         ttk.Button(nav_frame, text="Next ▶", command=self.next_month).pack(side=tk.RIGHT)
         ttk.Button(nav_frame, text="Today", command=self.goto_current_month).pack(side=tk.RIGHT, padx=(0, 10))
@@ -902,6 +909,20 @@ class CalendarWidget:
     def update_calendar(self):
         month_name = calendar.month_name[self.current_month]
         self.month_label.config(text=f"{month_name} {self.current_year}")
+
+        # Update today's date label with themed outline
+        theme = self.theme_manager.get_theme()
+        today = datetime.now().date()
+        date_format = self.preferences.get('date_format', '%Y-%m-%d')
+        self.today_label.config(
+            text=today.strftime(date_format),
+            bg=theme['header_bg'],
+            fg=theme['fg'],
+            highlightbackground=theme['border_color'],
+            highlightcolor=theme['border_color'],
+            highlightthickness=1,
+            font=("Arial", 10)
+        )
         
         for button in self.day_buttons.values():
             button.destroy()
@@ -909,7 +930,6 @@ class CalendarWidget:
         
         cal_data = self.calculator.get_calendar_data(self.current_year, self.current_month)
         colors = self.preferences.get('colors', {})
-        theme = self.theme_manager.get_theme()
         is_dark_theme = self.preferences.get('theme', 'light') == 'dark'
         
         cal = calendar.monthcalendar(self.current_year, self.current_month)
@@ -983,44 +1003,40 @@ class CalendarWidget:
                 else:
                     outline_width = 1
 
-                if not transactions:
-                    label = tk.Label(
-                        self.cal_frame,
-                        text=str(day),
-                        bg=theme['frame_bg'],
-                        fg=theme['fg'],
-                        relief=tk.FLAT,
-                        highlightbackground=outline_color,
-                        highlightcolor=outline_color,
-                        highlightthickness=outline_width,
-                    )
-                    label.grid(row=row, column=col, padx=1, pady=1, sticky="nsew")
-                    self.day_buttons[day] = label
-                else:
-                    # Container for day info and transaction color bars
-                    container = tk.Frame(
-                        self.cal_frame,
-                        bg=bg_color,
-                        bd=border_width,
-                        relief=tk.RAISED,
-                        highlightbackground=outline_color,
-                        highlightcolor=outline_color,
-                        highlightthickness=outline_width,
-                    )
-                    container.grid(row=row, column=col, padx=1, pady=1, sticky="nsew")
+                # Unified container for each day to keep sizes consistent
+                container = tk.Frame(
+                    self.cal_frame,
+                    bg=bg_color if transactions else theme['frame_bg'],
+                    bd=border_width if transactions else 1,
+                    relief=tk.RAISED if transactions else tk.FLAT,
+                    highlightbackground=outline_color,
+                    highlightcolor=outline_color,
+                    highlightthickness=outline_width,
+                    width=80,
+                    height=60,
+                )
+                container.grid(row=row, column=col, padx=1, pady=1, sticky="nsew")
+                container.grid_propagate(False)
 
+                if transactions:
                     button_text = f"{day}\n${daily_total:+,.0f}"
-                    label = tk.Label(
-                        container,
-                        text=button_text,
-                        bg=bg_color,
-                        fg=text_color,
-                        font=("Arial", 9, "bold" if is_today else "normal"),
-                        wraplength=80,
-                        justify=tk.CENTER,
-                        cursor="hand2"
-                    )
-                    label.pack(fill=tk.BOTH, expand=True)
+                    fg_color = text_color
+                else:
+                    button_text = str(day)
+                    fg_color = theme['fg']
+
+                label = tk.Label(
+                    container,
+                    text=button_text,
+                    bg=bg_color if transactions else theme['frame_bg'],
+                    fg=fg_color,
+                    font=("Arial", 9, "bold underline"),
+                    wraplength=80,
+                    justify=tk.CENTER,
+                    cursor="hand2" if transactions else "arrow",
+                )
+                label.pack(fill=tk.BOTH, expand=True)
+                if transactions:
                     label.bind("<Button-1>", lambda e, d=day: self.day_clicked(d))
 
                     # Canvas showing color-coded transactions
@@ -1028,24 +1044,23 @@ class CalendarWidget:
                         container,
                         height=5,
                         bg=bg_color,
-                        highlightthickness=0
+                        highlightthickness=0,
                     )
                     bar_canvas.pack(fill=tk.X)
 
-                    if transactions:
-                        bar_width = max(1, int(80 / len(transactions)))
-                        x = 0
-                        for trans in transactions:
-                            color = colors.get(trans.category, '#000000')
-                            bar_canvas.create_rectangle(
-                                x, 0, x + bar_width, 5,
-                                fill=color,
-                                outline=""
-                            )
-                            x += bar_width
+                    bar_width = max(1, int(80 / len(transactions)))
+                    x = 0
+                    for trans in transactions:
+                        color = colors.get(trans.category, '#000000')
+                        bar_canvas.create_rectangle(
+                            x, 0, x + bar_width, 5,
+                            fill=color,
+                            outline="",
+                        )
+                        x += bar_width
                     bar_canvas.bind("<Button-1>", lambda e, d=day: self.day_clicked(d))
 
-                    self.day_buttons[day] = container
+                self.day_buttons[day] = container
     
     def day_clicked(self, day):
         if self.on_day_click:
