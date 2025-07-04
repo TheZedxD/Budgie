@@ -3739,12 +3739,23 @@ class MonthlyAnalyzerWindow:
         self.current_year = datetime.now().year
         
         self.setup_window()
-        self.update_analysis()
-        
+
+        # Wait for widgets to size themselves before drawing charts
         self.dialog.update_idletasks()
         x = (self.dialog.winfo_screenwidth() // 2) - (self.dialog.winfo_width() // 2)
         y = (self.dialog.winfo_screenheight() // 2) - (self.dialog.winfo_height() // 2)
         self.dialog.geometry(f"+{x}+{y}")
+
+        # Draw charts after the window is displayed and keep them centered on resize
+        self.dialog.after(100, self.update_analysis)
+        self.resize_job = None
+        self.dialog.bind("<Configure>", self.on_resize)
+
+    def on_resize(self, event):
+        if self.resize_job:
+            self.dialog.after_cancel(self.resize_job)
+        # Debounce resize events to avoid excessive redraws
+        self.resize_job = self.dialog.after(200, self.update_analysis)
     
     def setup_window(self):
         main_frame = ttk.Frame(self.dialog, padding="10")
