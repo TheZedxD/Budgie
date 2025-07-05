@@ -1371,6 +1371,13 @@ class BudgieApp:
         ttk.Label(balance_frame, text="Crypto Portfolio:", font=("Arial", 10, "bold")).pack(anchor=tk.W, pady=(10, 0))
         self.crypto_balance_label = ttk.Label(balance_frame, text="$0.00", font=("Arial", 12))
         self.crypto_balance_label.pack(anchor=tk.W, padx=(10, 0))
+
+        columns = ("Symbol", "Amount", "Value")
+        self.portfolio_tree = ttk.Treeview(balance_frame, columns=columns, show="headings", height=5)
+        for col in columns:
+            self.portfolio_tree.heading(col, text=col)
+            self.portfolio_tree.column(col, width=80)
+        self.portfolio_tree.pack(fill=tk.X, padx=(10, 0), pady=(5, 0))
         
         # Total net worth
         ttk.Label(balance_frame, text="Total Net Worth:", font=("Arial", 10, "bold")).pack(anchor=tk.W, pady=(10, 0))
@@ -1449,12 +1456,25 @@ class BudgieApp:
             elif profit_loss < 0:
                 self.crypto_balance_label.config(foreground="red")
             else:
-                # Reset to default theme color
                 theme = self.theme_manager.get_theme()
                 self.crypto_balance_label.config(foreground=theme['fg'])
         else:
             theme = self.theme_manager.get_theme()
             self.crypto_balance_label.config(foreground=theme['fg'])
+
+        if hasattr(self, 'portfolio_tree'):
+            for item in self.portfolio_tree.get_children():
+                self.portfolio_tree.delete(item)
+            for holding in self.calculator.crypto_portfolio.holdings:
+                self.portfolio_tree.insert(
+                    "",
+                    "end",
+                    values=(
+                        holding.symbol,
+                        f"{holding.amount:.8f}",
+                        f"${holding.get_current_value():,.2f}"
+                    ),
+                )
     
     def calculate_monthly_summary(self, year, month):
         first_day = date(year, month, 1)
@@ -1564,10 +1584,18 @@ class BudgieApp:
             self.refresh_calendar()
             self.maybe_auto_save()
     
-    def manage_paychecks(self):
+    def manage_paychecks(self, year=None, month=None):
         if not self.calculator.paychecks:
             messagebox.showinfo("No Paychecks", "No paychecks to manage.")
             return
+
+        if year is None or month is None:
+            if hasattr(self, 'calendar_widget'):
+                year = self.calendar_widget.current_year
+                month = self.calendar_widget.current_month
+            else:
+                today = datetime.now()
+                year, month = today.year, today.month
 
         self.dialog = tk.Toplevel(self.root)
         self.dialog.title("Manage Paychecks")
@@ -1584,6 +1612,9 @@ class BudgieApp:
         frame.pack(fill=tk.BOTH, expand=True)
         
         ttk.Label(frame, text="Paycheck Management", font=("Arial", 12, "bold")).pack(pady=(0, 10))
+
+        month_name = calendar.month_name[month]
+        ttk.Label(frame, text=f"Showing {month_name} {year}").pack(pady=(0, 10))
         
         # Create notebook for tabs
         notebook = ttk.Notebook(frame)
@@ -1626,24 +1657,36 @@ class BudgieApp:
         tree.bind("<Button-3>", self.show_paycheck_context_menu)
         tree.bind("<Double-1>", lambda event: self.edit_paycheck_from_tree(tree))
         
+        month_start = date(year, month, 1)
+        month_end = date(year, month, calendar.monthrange(year, month)[1])
+
         for paycheck in self.calculator.paychecks:
+            if paycheck.start_date > month_end:
+                continue
+            if paycheck.end_date and paycheck.end_date < month_start:
+                continue
+
             gross_amount = paycheck.calculate_gross_pay()
             net_amount = paycheck.calculate_pay_amount()
             health_ins = getattr(paycheck, 'health_insurance', 0.0)
             other_ded = getattr(paycheck, 'other_deductions', 0.0)
             end_date_str = paycheck.end_date.strftime("%Y-%m-%d") if paycheck.end_date else "None"
-            tree.insert("", "end", values=(
-                paycheck.job_name,
-                f"${paycheck.hourly_rate:.2f}",
-                f"{paycheck.hours_per_week:.1f}",
-                paycheck.frequency.title(),
-                f"${gross_amount:.2f}",
-                f"${health_ins:.2f}",
-                f"${other_ded:.2f}",
-                f"${net_amount:.2f}",
-                paycheck.start_date.strftime("%Y-%m-%d"),
-                end_date_str
-            ))
+            tree.insert(
+                "",
+                "end",
+                values=(
+                    paycheck.job_name,
+                    f"${paycheck.hourly_rate:.2f}",
+                    f"{paycheck.hours_per_week:.1f}",
+                    paycheck.frequency.title(),
+                    f"${gross_amount:.2f}",
+                    f"${health_ins:.2f}",
+                    f"${other_ded:.2f}",
+                    f"${net_amount:.2f}",
+                    paycheck.start_date.strftime("%Y-%m-%d"),
+                    end_date_str,
+                ),
+            )
         
         # Tax breakdown tab
         breakdown_frame = ttk.Frame(notebook, padding="10")
@@ -1858,11 +1901,19 @@ class BudgieApp:
             self.refresh_calendar()
             self.maybe_auto_save()
     
-    def manage_transactions(self):
+    def manage_transactions(self, year=None, month=None):
         if not self.calculator.transactions:
             messagebox.showinfo("No Transactions", "No transactions to manage.")
             return
         
+        if year is None or month is None:
+            if hasattr(self, 'calendar_widget'):
+                year = self.calendar_widget.current_year
+                month = self.calendar_widget.current_month
+            else:
+                today = datetime.now()
+                year, month = today.year, today.month
+
         dialog = tk.Toplevel(self.root)
         dialog.title("Manage Transactions")
         dialog.geometry("1000x600")
@@ -1878,6 +1929,9 @@ class BudgieApp:
         frame.pack(fill=tk.BOTH, expand=True)
         
         ttk.Label(frame, text="Transaction Management", font=("Arial", 12, "bold")).pack(pady=(0, 10))
+
+        month_name = calendar.month_name[month]
+        ttk.Label(frame, text=f"Showing {month_name} {year}").pack(pady=(0, 10))
         
         # Create treeview frame
         tree_frame = ttk.Frame(frame)
@@ -1905,14 +1959,30 @@ class BudgieApp:
         tree.bind("<Button-3>", self.show_transaction_context_menu)
         tree.bind("<Double-1>", lambda event: self.edit_transaction_from_tree(tree))
         
+        month_start = date(year, month, 1)
+        month_end = date(year, month, calendar.monthrange(year, month)[1])
+
         for trans in self.calculator.transactions:
+            if trans.start_date > month_end:
+                continue
+            if trans.end_date and trans.end_date < month_start:
+                continue
+
             type_str = "Income" if trans.transaction_type == "income" else "Expense"
             end_date_str = trans.end_date.strftime("%Y-%m-%d") if trans.end_date else "None"
-            tree.insert("", "end", values=(
-                trans.name, type_str, f"${trans.amount:.2f}", 
-                trans.frequency.title(), trans.start_date.strftime("%Y-%m-%d"),
-                end_date_str, trans.category.title()
-            ))
+            tree.insert(
+                "",
+                "end",
+                values=(
+                    trans.name,
+                    type_str,
+                    f"${trans.amount:.2f}",
+                    trans.frequency.title(),
+                    trans.start_date.strftime("%Y-%m-%d"),
+                    end_date_str,
+                    trans.category.title(),
+                ),
+            )
         
         def edit_selected():
             selection = tree.selection()
