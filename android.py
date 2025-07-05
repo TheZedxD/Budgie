@@ -553,6 +553,20 @@ class BudgetCalculator:
 
         return cal_data
 
+    def get_transactions_for_month(self, year, month):
+        """Return a list of (date, transaction) tuples for the given month."""
+        month_start = date(year, month, 1)
+        month_end = date(year, month, calendar.monthrange(year, month)[1])
+
+        entries = []
+        current_day = month_start
+        while current_day <= month_end:
+            txns = self.get_transactions_for_date(current_day)
+            for t in txns:
+                entries.append((current_day, t))
+            current_day += timedelta(days=1)
+        return entries
+
     def to_dict(self):
         return {
             'transactions': [t.to_dict() for t in self.transactions],
@@ -894,19 +908,14 @@ class TransactionsScreen(Screen):
 
         year = self.app.selected_year
         month = self.app.selected_month
-        month_start = date(year, month, 1)
-        month_end = date(year, month, calendar.monthrange(year, month)[1])
 
-        current_day = month_start
-        while current_day <= month_end:
-            txns = self.app.calculator.get_transactions_for_date(current_day)
-            for t in txns:
-                items.append(f"{current_day.strftime('%Y-%m-%d')} {t.name}: {t.amount:+.2f} ({t.frequency})")
-                if t.transaction_type == 'income':
-                    income_total += t.amount
-                else:
-                    expense_total += t.amount
-            current_day += timedelta(days=1)
+        entries = self.app.calculator.get_transactions_for_month(year, month)
+        for dt, t in entries:
+            items.append(f"{dt.strftime('%Y-%m-%d')} {t.name}: {t.amount:+.2f} ({t.frequency})")
+            if t.transaction_type == 'income':
+                income_total += t.amount
+            else:
+                expense_total += t.amount
 
         net = income_total - expense_total
         month_name = calendar.month_name[month]
@@ -1135,12 +1144,17 @@ class PortfolioScreen(Screen):
         for h in self.app.calculator.crypto_portfolio.holdings:
             value = h.get_current_value()
             total += value
-            txt = (
-                f"{h.symbol} - {h.amount} @ ${h.current_price:.2f} = ${value:.2f}"
-            )
+            price = f"${h.current_price:.2f}" if h.current_price else "N/A"
+            txt = f"{h.symbol} - {h.amount} @ {price} = ${value:.2f}"
             items.append(txt)
 
-        self.summary.text = f"Total Portfolio Value: ${total:.2f}"
+        last_updated = self.app.calculator.crypto_portfolio.last_updated
+        if last_updated:
+            updated = last_updated.strftime('%Y-%m-%d %H:%M')
+            self.summary.text = f"Total Portfolio Value: ${total:.2f} (Updated {updated})"
+        else:
+            self.summary.text = f"Total Portfolio Value: ${total:.2f}"
+
         self.view.refresh(items)
 
     def refresh_prices(self):
