@@ -7,6 +7,7 @@ from dateutil.relativedelta import relativedelta
 from kivy.app import App
 from kivy.uix.boxlayout import BoxLayout
 from kivy.uix.gridlayout import GridLayout
+from kivy.uix.anchorlayout import AnchorLayout
 from kivy.uix.button import Button
 from kivy.uix.label import Label
 from kivy.uix.textinput import TextInput
@@ -597,7 +598,8 @@ class TransactionsView(RecycleView):
                 'text': text,
                 'color': (1, 1, 1, 1),
                 'background_normal': '',
-                'background_color': (0.2, 0.2, 0.2, 1)
+                'background_color': (0.2, 0.2, 0.2, 1),
+                'halign': 'center'
             }
             if callbacks and idx < len(callbacks) and callbacks[idx]:
                 item['on_release'] = callbacks[idx]
@@ -618,7 +620,7 @@ class CalendarScreen(Screen):
         self.summary.bind(size=self._update_summary_size, texture_size=self._update_summary_height)
         layout.add_widget(self.summary)
 
-        header = BoxLayout(size_hint_y=0.08)
+        header = BoxLayout(size_hint_y=0.06)
         header.add_widget(Button(text='<', size_hint_x=0.15,
                                  on_release=lambda x: self.prev_month(),
                                  background_normal='',
@@ -626,7 +628,7 @@ class CalendarScreen(Screen):
                                  color=(1, 1, 1, 1)))
 
         center_box = BoxLayout()
-        self.month_label = Label(text='', color=(1,1,1,1), font_size='20sp')
+        self.month_label = Label(text='', color=(1,1,1,1), font_size='18sp')
         self.today_label = Label(text='', color=(1,1,1,1), font_size='12sp')
         center_box.add_widget(self.month_label)
         center_box.add_widget(self.today_label)
@@ -646,7 +648,7 @@ class CalendarScreen(Screen):
         layout.add_widget(header)
 
         # Grid for the calendar with square cells
-        self.cell_size = 80
+        self.cell_size = self._calculate_cell_size()
         self.grid = GridLayout(
             cols=7,
             size_hint=(None, None),
@@ -656,9 +658,12 @@ class CalendarScreen(Screen):
             col_default_width=self.cell_size,
         )
         # Grid size will be configured after the first calendar update
-        layout.add_widget(self.grid)
+        grid_container = AnchorLayout()
+        grid_container.add_widget(self.grid)
+        layout.add_widget(grid_container)
 
         self.add_widget(layout)
+        Window.bind(size=self._on_window_size)
         self.update_calendar()
         # Initialize selected month/year in the parent app
         self.app.selected_year = self.current_year
@@ -669,6 +674,15 @@ class CalendarScreen(Screen):
 
     def _update_summary_height(self, instance, size):
         instance.height = size[1]
+
+    def _calculate_cell_size(self):
+        return min(Window.width, Window.height) // 8
+
+    def _on_window_size(self, *args):
+        self.cell_size = self._calculate_cell_size()
+        self.grid.row_default_height = self.cell_size
+        self.grid.col_default_width = self.cell_size
+        self._update_grid_size()
 
     def _update_grid_size(self):
         self.grid.width = self.cell_size * 7
@@ -799,7 +813,7 @@ class CalendarScreen(Screen):
         btn_box.add_widget(close_btn)
         content.add_widget(btn_box)
 
-        popup = Popup(title='Day Detail', content=content, size_hint=(0.8,0.8))
+        popup = Popup(title='Day Detail', content=content, size_hint=(0.7,0.5))
 
         def add_trans(instance):
             popup.dismiss()
@@ -841,7 +855,7 @@ class CalendarScreen(Screen):
 
         content.add_widget(Button(text='Add', on_release=done,
                                  background_normal='', background_color=(0.2,0.2,0.2,1), color=(1,1,1,1)))
-        popup = Popup(title='Add Transaction', content=content, size_hint=(0.8,0.6))
+        popup = Popup(title='Add Transaction', content=content, size_hint=(0.7,0.6))
         popup.open()
 
 class TransactionsScreen(Screen):
@@ -895,8 +909,10 @@ class TransactionsScreen(Screen):
             current_day += timedelta(days=1)
 
         net = income_total - expense_total
-        self.summary.text = (f"Income: ${income_total:.2f}  Expenses: ${expense_total:.2f}  "
-                             f"Net: ${net:+.2f}")
+        month_name = calendar.month_name[month]
+        self.summary.text = (
+            f"{month_name} {year} - Income: ${income_total:.2f}  Expenses: ${expense_total:.2f}\n"
+            f"Net: ${net:+.2f}")
 
         # Include paycheck info
         if self.app.calculator.paychecks:
@@ -943,7 +959,7 @@ class TransactionsScreen(Screen):
                 popup.dismiss()
         content.add_widget(Button(text='Add', on_release=done,
                                  background_normal='', background_color=(0.2,0.2,0.2,1), color=(1,1,1,1)))
-        popup = Popup(title='Add Transaction', content=content, size_hint=(0.8,0.6))
+        popup = Popup(title='Add Transaction', content=content, size_hint=(0.7,0.6))
         popup.open()
 
 class PaycheckScreen(Screen):
@@ -999,7 +1015,8 @@ class PaycheckScreen(Screen):
         items = [e[1] for e in entries]
         callbacks = [e[2] for e in entries]
 
-        self.summary.text = f"Total Net Pay: ${total:.2f}"
+        month_name = calendar.month_name[month]
+        self.summary.text = f"{month_name} {year} - Total Net Pay: ${total:.2f}"
         self.view.refresh(items, callbacks)
 
     def add(self):
@@ -1032,7 +1049,7 @@ class PaycheckScreen(Screen):
                 popup.dismiss()
         content.add_widget(Button(text='Add', on_release=done,
                                  background_normal='', background_color=(0.2,0.2,0.2,1), color=(1,1,1,1)))
-        popup = Popup(title='Add Paycheck', content=content, size_hint=(0.8,0.6))
+        popup = Popup(title='Add Paycheck', content=content, size_hint=(0.7,0.6))
         popup.open()
 
     def edit(self, index):
@@ -1078,7 +1095,7 @@ class PaycheckScreen(Screen):
         btn_box.add_widget(Button(text='Delete', on_release=delete,
                                   background_normal='', background_color=(0.5,0.2,0.2,1), color=(1,1,1,1)))
         content.add_widget(btn_box)
-        popup = Popup(title='Edit Paycheck', content=content, size_hint=(0.8,0.7))
+        popup = Popup(title='Edit Paycheck', content=content, size_hint=(0.7,0.7))
         popup.open()
 
 
@@ -1148,7 +1165,7 @@ class PortfolioScreen(Screen):
                 popup.dismiss()
         content.add_widget(Button(text='Add', on_release=done,
                                  background_normal='', background_color=(0.2,0.2,0.2,1), color=(1,1,1,1)))
-        popup = Popup(title='Add Holding', content=content, size_hint=(0.8,0.6))
+        popup = Popup(title='Add Holding', content=content, size_hint=(0.7,0.6))
         popup.open()
 
 class SettingsScreen(Screen):
