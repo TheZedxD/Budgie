@@ -648,7 +648,7 @@ class CalendarScreen(Screen):
             row_default_height=self.cell_size,
             col_default_width=self.cell_size,
         )
-        self._update_grid_size()
+        # Grid size will be configured after the first calendar update
         layout.add_widget(self.grid)
 
         self.add_widget(layout)
