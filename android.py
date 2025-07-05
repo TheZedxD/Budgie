@@ -576,9 +576,9 @@ class TransactionItem(BoxLayout, RecycleDataViewBehavior):
     text = StringProperty("")
 
 class TransactionsView(RecycleView):
-    def __init__(self, viewclass='Label', **kwargs):
+    def __init__(self, viewclass='Button', **kwargs):
         super().__init__(**kwargs)
-        # Allow different widgets for items (Label by default)
+        # Allow different widgets for items (Button by default so callbacks work)
         self.viewclass = viewclass
         # Ensure vertical layout for list items
         from kivy.uix.recycleboxlayout import RecycleBoxLayout
@@ -593,13 +593,14 @@ class TransactionsView(RecycleView):
     def refresh(self, items, callbacks=None):
         data = []
         for idx, text in enumerate(items):
-            item = {'text': text, 'color': (1, 1, 1, 1)}
+            item = {
+                'text': text,
+                'color': (1, 1, 1, 1),
+                'background_normal': '',
+                'background_color': (0.2, 0.2, 0.2, 1)
+            }
             if callbacks and idx < len(callbacks) and callbacks[idx]:
-                item.update({
-                    'on_release': callbacks[idx],
-                    'background_normal': '',
-                    'background_color': (0.2, 0.2, 0.2, 1)
-                })
+                item['on_release'] = callbacks[idx]
             data.append(item)
         self.data = data
 
@@ -617,7 +618,7 @@ class CalendarScreen(Screen):
         self.summary.bind(size=self._update_summary_size, texture_size=self._update_summary_height)
         layout.add_widget(self.summary)
 
-        header = BoxLayout(size_hint_y=0.1)
+        header = BoxLayout(size_hint_y=0.08)
         header.add_widget(Button(text='<', size_hint_x=0.15,
                                  on_release=lambda x: self.prev_month(),
                                  background_normal='',
@@ -625,11 +626,17 @@ class CalendarScreen(Screen):
                                  color=(1, 1, 1, 1)))
 
         center_box = BoxLayout()
-        self.month_label = Label(text='', color=(1,1,1,1))
+        self.month_label = Label(text='', color=(1,1,1,1), font_size='20sp')
         self.today_label = Label(text='', color=(1,1,1,1), font_size='12sp')
         center_box.add_widget(self.month_label)
         center_box.add_widget(self.today_label)
         header.add_widget(center_box)
+
+        header.add_widget(Button(text='Today', size_hint_x=0.15,
+                                 on_release=lambda x: self.goto_today(),
+                                 background_normal='',
+                                 background_color=(0.2,0.2,0.2,1),
+                                 color=(1,1,1,1)))
 
         header.add_widget(Button(text='>', size_hint_x=0.15,
                                  on_release=lambda x: self.next_month(),
@@ -683,6 +690,14 @@ class CalendarScreen(Screen):
             self.current_year += 1
         else:
             self.current_month += 1
+        self.update_calendar()
+        self.app.selected_year = self.current_year
+        self.app.selected_month = self.current_month
+
+    def goto_today(self):
+        today = date.today()
+        self.current_year = today.year
+        self.current_month = today.month
         self.update_calendar()
         self.app.selected_year = self.current_year
         self.app.selected_month = self.current_month
@@ -746,8 +761,8 @@ class CalendarScreen(Screen):
                     txt_color = (1, 1, 1, 1)
                     if (day == today.day and self.current_month == today.month and
                             self.current_year == today.year):
-                        bg = (1.0, 1.0, 0.2, 1)
-                        txt_color = (0, 0, 0, 1)
+                        bg = (0.2, 0.4, 1.0, 1)
+                        txt_color = (1, 1, 1, 1)
                     btn = Button(
                         text=f'[u][b]{txt}[/b][/u]',
                         markup=True,
@@ -853,6 +868,9 @@ class TransactionsScreen(Screen):
                                   background_normal='', background_color=(0.2,0.2,0.2,1), color=(1,1,1,1)))
         layout.add_widget(btn_box)
         self.add_widget(layout)
+        self.refresh()
+
+    def on_pre_enter(self):
         self.refresh()
 
     def refresh(self):
