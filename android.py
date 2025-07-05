@@ -590,6 +590,31 @@ class BudgetCalculator:
 class TransactionItem(BoxLayout, RecycleDataViewBehavior):
     text = StringProperty("")
 
+class PortfolioItem(BoxLayout, RecycleDataViewBehavior):
+    """Row widget displaying a crypto holding in columns."""
+
+    symbol = StringProperty("")
+    amount = StringProperty("")
+    value = StringProperty("")
+
+    def __init__(self, **kwargs):
+        super().__init__(orientation='horizontal', **kwargs)
+        self.size_hint_y = None
+        self.height = 30
+        self.spacing = 10
+        self.symbol_lbl = Label(size_hint_x=0.3, color=(1, 1, 1, 1))
+        self.amount_lbl = Label(size_hint_x=0.3, color=(1, 1, 1, 1))
+        self.value_lbl = Label(size_hint_x=0.4, color=(1, 1, 1, 1))
+        self.add_widget(self.symbol_lbl)
+        self.add_widget(self.amount_lbl)
+        self.add_widget(self.value_lbl)
+
+    def refresh_view_attrs(self, rv, index, data):
+        self.symbol_lbl.text = data.get('symbol', '')
+        self.amount_lbl.text = data.get('amount', '')
+        self.value_lbl.text = data.get('value', '')
+        return super().refresh_view_attrs(rv, index, data)
+
 class TransactionsView(RecycleView):
     def __init__(self, viewclass='Button', **kwargs):
         super().__init__(**kwargs)
@@ -618,6 +643,36 @@ class TransactionsView(RecycleView):
             if callbacks and idx < len(callbacks) and callbacks[idx]:
                 item['on_release'] = callbacks[idx]
             data.append(item)
+        self.data = data
+
+
+class PortfolioView(RecycleView):
+    """RecycleView showing crypto holdings using PortfolioItem."""
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.viewclass = PortfolioItem
+        from kivy.uix.recycleboxlayout import RecycleBoxLayout
+        self.layout_manager = RecycleBoxLayout(
+            default_size=(None, 30),
+            default_size_hint=(1, None),
+            size_hint=(1, None),
+            orientation='vertical'
+        )
+        self.layout_manager.bind(minimum_height=self.layout_manager.setter('height'))
+        self.add_widget(self.layout_manager)
+        self.refresh([])
+
+    def refresh(self, rows):
+        data = []
+        for row in rows:
+            data.append({
+                'symbol': row.get('symbol', ''),
+                'amount': row.get('amount', ''),
+                'value': row.get('value', '')
+            })
+        if not data:
+            data.append({'symbol': '', 'amount': '', 'value': 'No holdings recorded'})
         self.data = data
 
 class CalendarScreen(Screen):
@@ -885,12 +940,17 @@ class TransactionsScreen(Screen):
                            texture_size=lambda i, s: i.setter('height')(i, s[1]))
         layout.add_widget(self.summary)
 
-        self.view = TransactionsView(size_hint_y=0.8)
+        header_row = BoxLayout(size_hint_y=None, height=30)
+        for text in ['Symbol', 'Amount', 'Value']:
+            header_row.add_widget(Label(text=text, color=(1, 1, 1, 1)))
+        layout.add_widget(header_row)
+
+        self.view = PortfolioView(size_hint_y=0.8)
         layout.add_widget(self.view)
         btn_box = BoxLayout(size_hint_y=0.1)
         btn_box.add_widget(Button(text='Add', on_release=lambda x: self.add(),
                                   background_normal='', background_color=(0.2,0.2,0.2,1), color=(1,1,1,1)))
-        btn_box.add_widget(Button(text='Save', on_release=lambda x: app.save_data(),
+        btn_box.add_widget(Button(text='Refresh', on_release=lambda x: self.refresh(),
                                   background_normal='', background_color=(0.2,0.2,0.2,1), color=(1,1,1,1)))
         btn_box.add_widget(Button(text='Back', on_release=lambda x: setattr(app.sm, 'current', 'calendar'),
                                   background_normal='', background_color=(0.2,0.2,0.2,1), color=(1,1,1,1)))
@@ -1146,15 +1206,17 @@ class PortfolioScreen(Screen):
 
     def refresh(self):
         self.app.calculator.update_crypto_prices()
-        items = []
+        rows = []
         total = 0
 
         for h in self.app.calculator.crypto_portfolio.holdings:
             value = h.get_current_value()
             total += value
-            price = f"${h.current_price:.2f}" if h.current_price else "N/A"
-            txt = f"{h.symbol} - {h.amount} @ {price} = ${value:.2f}"
-            items.append(txt)
+            rows.append({
+                'symbol': h.symbol,
+                'amount': f"{h.amount:.8f}",
+                'value': f"${value:.2f}"
+            })
 
         last_updated = self.app.calculator.crypto_portfolio.last_updated
         if last_updated:
@@ -1163,10 +1225,7 @@ class PortfolioScreen(Screen):
         else:
             self.summary.text = f"Total Portfolio Value: ${total:.2f}"
 
-        if not items:
-            items.append('No holdings recorded')
-
-        self.view.refresh(items)
+        self.view.refresh(rows)
 
     def refresh_prices(self):
         self.refresh()
