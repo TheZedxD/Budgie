@@ -930,6 +930,9 @@ class TransactionsScreen(Screen):
             ])
             self.summary.text += f"\nPaychecks: {p_info}"
 
+        if not items:
+            items.append('No transactions found')
+
         self.view.refresh(items)
 
     def add(self):
@@ -1026,6 +1029,11 @@ class PaycheckScreen(Screen):
 
         month_name = calendar.month_name[month]
         self.summary.text = f"{month_name} {year} - Total Net Pay: ${total:.2f}"
+
+        if not items:
+            items = ['No paychecks scheduled']
+            callbacks = [None]
+
         self.view.refresh(items, callbacks)
 
     def add(self):
@@ -1154,6 +1162,9 @@ class PortfolioScreen(Screen):
             self.summary.text = f"Total Portfolio Value: ${total:.2f} (Updated {updated})"
         else:
             self.summary.text = f"Total Portfolio Value: ${total:.2f}"
+
+        if not items:
+            items.append('No holdings recorded')
 
         self.view.refresh(items)
 
