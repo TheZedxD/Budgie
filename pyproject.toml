@@ -1,0 +1,11 @@
+[project]
+name = "budgie"
+version = "0.1.0"
+dependencies = [
+    "python-dateutil",
+]
+
+[project.optional-dependencies]
+android = [
+    "kivy",
+]
