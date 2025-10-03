@@ -1,0 +1,1564 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Budgie Standalone</title>
+  <link
+    rel="stylesheet"
+    href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css"
+  />
+  <style>
+    body {
+      font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    }
+    .min-h-screen {
+      min-height: 100vh;
+    }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <script src="https://unpkg.com/recharts/umd/Recharts.min.js"></script>
+
+  <script type="text/babel">
+    const { useState, useMemo, useEffect } = React;
+    const {
+      ResponsiveContainer,
+      PieChart: RechartsPieChart,
+      Pie,
+      Cell,
+      Tooltip,
+      Legend,
+      BarChart,
+      Bar,
+      CartesianGrid,
+      XAxis,
+      YAxis
+    } = Recharts;
+
+    const IconBase = ({ children, className = "", viewBox = "0 0 24 24" }) => (
+      <svg
+        className={className}
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        viewBox={viewBox}
+      >
+        {children}
+      </svg>
+    );
+
+    const CalendarIcon = ({ className }) => (
+      <IconBase className={className}>
+        <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+        <line x1="16" y1="2" x2="16" y2="6"></line>
+        <line x1="8" y1="2" x2="8" y2="6"></line>
+        <line x1="3" y1="10" x2="21" y2="10"></line>
+      </IconBase>
+    );
+
+    const DollarSignIcon = ({ className }) => (
+      <IconBase className={className}>
+        <line x1="12" y1="1" x2="12" y2="23"></line>
+        <path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 110 7H6"></path>
+      </IconBase>
+    );
+
+    const PlusIcon = ({ className }) => (
+      <IconBase className={className}>
+        <line x1="12" y1="5" x2="12" y2="19"></line>
+        <line x1="5" y1="12" x2="19" y2="12"></line>
+      </IconBase>
+    );
+
+    const SettingsIcon = ({ className }) => (
+      <IconBase className={className}>
+        <circle cx="12" cy="12" r="3"></circle>
+        <path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 01-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09a1.65 1.65 0 00-1-1.51 1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09a1.65 1.65 0 001.51-1 1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 112.83-2.83l.06.06a1.65 1.65 0 001.82.33H9a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51h.09a1.65 1.65 0 001.82-.33l.06-.06a2 2 0 112.83 2.83l-.06.06a1.65 1.65 0 00-.33 1.82v.09a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"></path>
+      </IconBase>
+    );
+
+    const PieChartIcon = ({ className }) => (
+      <IconBase className={className}>
+        <path d="M21.21 15.89A10 10 0 1112 2v10z"></path>
+        <path d="M22 12A10 10 0 0012 2v10z"></path>
+      </IconBase>
+    );
+
+    const CreditCardIcon = ({ className }) => (
+      <IconBase className={className}>
+        <rect x="2" y="5" width="20" height="14" rx="2"></rect>
+        <line x1="2" y1="10" x2="22" y2="10"></line>
+      </IconBase>
+    );
+
+    const WalletIcon = ({ className }) => (
+      <IconBase className={className}>
+        <rect x="3" y="5" width="18" height="14" rx="2" ry="2"></rect>
+        <path d="M16 7h1a2 2 0 012 2v6a2 2 0 01-2 2h-1z"></path>
+        <path d="M7 7a2 2 0 012-2h8"></path>
+      </IconBase>
+    );
+
+    const ChevronLeftIcon = ({ className }) => (
+      <IconBase className={className}>
+        <polyline points="15 18 9 12 15 6"></polyline>
+      </IconBase>
+    );
+
+    const ChevronRightIcon = ({ className }) => (
+      <IconBase className={className}>
+        <polyline points="9 18 15 12 9 6"></polyline>
+      </IconBase>
+    );
+
+    const MoonIcon = ({ className }) => (
+      <IconBase className={className}>
+        <path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"></path>
+      </IconBase>
+    );
+
+    const SunIcon = ({ className }) => (
+      <IconBase className={className}>
+        <circle cx="12" cy="12" r="5"></circle>
+        <line x1="12" y1="1" x2="12" y2="3"></line>
+        <line x1="12" y1="21" x2="12" y2="23"></line>
+        <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+        <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+        <line x1="1" y1="12" x2="3" y2="12"></line>
+        <line x1="21" y1="12" x2="23" y2="12"></line>
+        <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+        <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+      </IconBase>
+    );
+
+    const generateCalendar = (year, month, firstWeekday = 6) => {
+      const firstDay = new Date(year, month, 1);
+      const lastDay = new Date(year, month + 1, 0);
+      const daysInMonth = lastDay.getDate();
+      const startingDayOfWeek = firstDay.getDay();
+
+      let offset = startingDayOfWeek - firstWeekday;
+      if (offset < 0) offset += 7;
+
+      const weeks = [];
+      let week = Array(offset).fill(null);
+
+      for (let day = 1; day <= daysInMonth; day++) {
+        week.push(day);
+        if (week.length === 7) {
+          weeks.push(week);
+          week = [];
+        }
+      }
+
+      if (week.length > 0) {
+        while (week.length < 7) week.push(null);
+        weeks.push(week);
+      }
+
+      return weeks;
+    };
+
+    const BudgieApp = () => {
+      const [darkMode, setDarkMode] = useState(false);
+      const [currentDate, setCurrentDate] = useState(new Date());
+      const [activeView, setActiveView] = useState('calendar');
+      const [selectedDate, setSelectedDate] = useState(null);
+      const [showDayModal, setShowDayModal] = useState(false);
+      const [sidebarOpen, setSidebarOpen] = useState(false);
+      const [contextMenu, setContextMenu] = useState(null);
+      const [showTransactionManager, setShowTransactionManager] = useState(false);
+      const [editingTransaction, setEditingTransaction] = useState(null);
+      const [showCryptoManager, setShowCryptoManager] = useState(false);
+      const [editingCrypto, setEditingCrypto] = useState(null);
+
+      useEffect(() => {
+        const bodyColor = darkMode ? '#111827' : '#f9fafb';
+        document.body.style.backgroundColor = bodyColor;
+        document.documentElement.style.backgroundColor = bodyColor;
+        return () => {
+          document.body.style.backgroundColor = '';
+          document.documentElement.style.backgroundColor = '';
+        };
+      }, [darkMode]);
+
+      const [transactions, setTransactions] = useState([]);
+      const [cryptoHoldings, setCryptoHoldings] = useState([]);
+      const [currentBalance, setCurrentBalance] = useState(0);
+
+      const year = currentDate.getFullYear();
+      const month = currentDate.getMonth();
+      const monthName = currentDate.toLocaleString('default', { month: 'long' });
+
+      const getTransactionsForDate = (date) => {
+        const targetDate = new Date(year, month, date);
+        return transactions.filter(t => {
+          const start = new Date(t.startDate);
+          if (targetDate < start) return false;
+
+          if (t.frequency === 'one-time') {
+            return start.toDateString() === targetDate.toDateString();
+          } else if (t.frequency === 'daily') {
+            return true;
+          } else if (t.frequency === 'weekly') {
+            const daysDiff = Math.floor((targetDate - start) / (1000 * 60 * 60 * 24));
+            return daysDiff >= 0 && daysDiff % 7 === 0;
+          } else if (t.frequency === 'bi-weekly') {
+            const daysDiff = Math.floor((targetDate - start) / (1000 * 60 * 60 * 24));
+            return daysDiff >= 0 && daysDiff % 14 === 0;
+          } else if (t.frequency === 'monthly') {
+            return start.getDate() === date;
+          } else if (t.frequency === 'yearly') {
+            return start.getDate() === date && start.getMonth() === month;
+          }
+          return false;
+        });
+      };
+
+      const getDailyTotal = (date) => {
+        const dayTransactions = getTransactionsForDate(date);
+        return dayTransactions.reduce((sum, t) => sum + (t.type === 'income' ? t.amount : -t.amount), 0);
+      };
+
+      const clearTransactionsForDay = (date) => {
+        const targetDate = new Date(year, month, date);
+        setTransactions(prev => prev.filter(t => {
+          const start = new Date(t.startDate);
+          if (t.frequency === 'one-time') {
+            return start.toDateString() !== targetDate.toDateString();
+          }
+          return true;
+        }));
+        setContextMenu(null);
+      };
+
+      const monthlyTotals = useMemo(() => {
+        let income = 0;
+        let expenses = 0;
+        const lastDay = new Date(year, month + 1, 0).getDate();
+
+        for (let day = 1; day <= lastDay; day++) {
+          const dayTransactions = getTransactionsForDate(day);
+          dayTransactions.forEach(t => {
+            if (t.type === 'income') income += t.amount;
+            else expenses += t.amount;
+          });
+        }
+
+        return { income, expenses, net: income - expenses };
+      }, [month, year, transactions]);
+
+      const categoryData = useMemo(() => {
+        const categories = {};
+        const lastDay = new Date(year, month + 1, 0).getDate();
+
+        for (let day = 1; day <= lastDay; day++) {
+          const dayTransactions = getTransactionsForDate(day);
+          dayTransactions.forEach(t => {
+            if (t.type === 'expense') {
+              categories[t.category] = (categories[t.category] || 0) + t.amount;
+            }
+          });
+        }
+
+        return Object.entries(categories).map(([name, value]) => ({ name, value }));
+      }, [month, year, transactions]);
+
+      const cryptoValue = cryptoHoldings.reduce((sum, h) => sum + (h.amount * h.currentPrice), 0);
+      const totalNetWorth = currentBalance + cryptoValue;
+
+      const cryptoPieData = cryptoHoldings.map(h => ({
+        name: h.symbol,
+        value: h.amount * h.currentPrice,
+        fullName: h.name
+      }));
+
+      const exportBudgie = () => {
+        const data = {
+          transactions,
+          cryptoHoldings,
+          currentBalance,
+          exportDate: new Date().toISOString(),
+          version: '1.0'
+        };
+
+        const dataStr = JSON.stringify(data, null, 2);
+        const blob = new Blob([dataStr], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `budgie-backup-${new Date().toISOString().split('T')[0]}.json`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+      };
+
+      const importBudgie = (event) => {
+        const file = event.target.files[0];
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          try {
+            const data = JSON.parse(e.target.result);
+
+            if (data.transactions) setTransactions(data.transactions);
+            if (data.cryptoHoldings) setCryptoHoldings(data.cryptoHoldings);
+            if (data.currentBalance !== undefined) setCurrentBalance(data.currentBalance);
+
+            alert('Data loaded successfully!');
+          } catch (error) {
+            alert('Error loading file: ' + error.message);
+          }
+        };
+        reader.readAsText(file);
+        event.target.value = '';
+      };
+
+      const calendarWeeks = generateCalendar(year, month);
+      const today = new Date();
+      const isCurrentMonth = today.getMonth() === month && today.getFullYear() === year;
+
+      const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#06b6d4', '#84cc16'];
+
+      const prevMonth = () => setCurrentDate(new Date(year, month - 1));
+      const nextMonth = () => setCurrentDate(new Date(year, month + 1));
+      const gotoToday = () => setCurrentDate(new Date());
+
+      const bgClass = darkMode ? 'bg-gray-900' : 'bg-gray-50';
+      const cardBg = darkMode ? 'bg-gray-800' : 'bg-white';
+      const textClass = darkMode ? 'text-white' : 'text-gray-900';
+      const textMuted = darkMode ? 'text-gray-400' : 'text-gray-600';
+      const borderClass = darkMode ? 'border-gray-700' : 'border-gray-200';
+
+      const handleRightClick = (e, day) => {
+        e.preventDefault();
+        setContextMenu({ x: e.pageX, y: e.pageY, day });
+      };
+
+      const handleBackgroundClick = () => {
+        setSelectedDate(null);
+        setContextMenu(null);
+      };
+
+      return (
+        <div
+          className={`min-h-screen ${bgClass} ${textClass} transition-colors duration-200`}
+          onClick={() => setContextMenu(null)}
+        >
+          <header className={`${cardBg} border-b ${borderClass} shadow-sm fixed top-0 left-0 right-0 z-20 backdrop-blur-md bg-opacity-95`}>
+            <div className="max-w-7xl mx-auto px-4 py-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <button
+                    onClick={() => setSidebarOpen(true)}
+                    className={`p-2 rounded-lg transition-colors ${darkMode ? 'hover:bg-gray-700' : 'hover:bg-gray-100'}`}
+                  >
+                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16M4 18h16" />
+                    </svg>
+                  </button>
+                  <WalletIcon className="w-8 h-8 text-blue-500" />
+                  <h1 className="text-2xl font-bold">Budgie</h1>
+                </div>
+
+                <nav className="flex items-center gap-2">
+                  <button
+                    onClick={() => setActiveView('calendar')}
+                    className={`px-4 py-2 rounded-lg transition-colors ${
+                      activeView === 'calendar'
+                        ? 'bg-blue-500 text-white'
+                        : darkMode ? 'hover:bg-gray-700' : 'hover:bg-gray-100'
+                    }`}
+                  >
+                    <CalendarIcon className="w-5 h-5" />
+                  </button>
+                  <button
+                    onClick={() => setActiveView('transactions')}
+                    className={`px-4 py-2 rounded-lg transition-colors ${
+                      activeView === 'transactions'
+                        ? 'bg-blue-500 text-white'
+                        : darkMode ? 'hover:bg-gray-700' : 'hover:bg-gray-100'
+                    }`}
+                  >
+                    <CreditCardIcon className="w-5 h-5" />
+                  </button>
+                  <button
+                    onClick={() => setActiveView('analytics')}
+                    className={`px-4 py-2 rounded-lg transition-colors ${
+                      activeView === 'analytics'
+                        ? 'bg-blue-500 text-white'
+                        : darkMode ? 'hover:bg-gray-700' : 'hover:bg-gray-100'
+                    }`}
+                  >
+                    <PieChartIcon className="w-5 h-5" />
+                  </button>
+                </nav>
+              </div>
+            </div>
+          </header>
+
+          <div className="max-w-7xl mx-auto px-4 py-6 pt-24" onClick={handleBackgroundClick}>
+            <div className={`${cardBg} rounded-lg border ${borderClass} p-6 shadow-sm mb-6`}>
+              <div className="flex items-center justify-between gap-8">
+                <div className="flex-1">
+                  <p className={`text-sm ${textMuted} mb-1`}>Total Net Worth</p>
+                  <p className="text-4xl font-bold text-green-500">${totalNetWorth.toLocaleString(undefined, {maximumFractionDigits: 0})}</p>
+                </div>
+
+                <div className="flex gap-8">
+                  <div>
+                    <p className={`text-xs ${textMuted} mb-1`}>Current Balance</p>
+                    <p className="text-2xl font-semibold">${currentBalance.toLocaleString()}</p>
+                  </div>
+                  <div>
+                    <p className={`text-xs ${textMuted} mb-1`}>Crypto Portfolio</p>
+                    <p className="text-2xl font-semibold text-blue-500">${cryptoValue.toLocaleString(undefined, {maximumFractionDigits: 0})}</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <main>
+              {activeView === 'calendar' && (
+                <div className={`${cardBg} rounded-lg border ${borderClass} shadow-sm`}>
+                  <div className={`p-4 border-b ${borderClass} flex items-center justify-between`}>
+                    <button onClick={prevMonth} className={`p-2 rounded-lg ${darkMode ? 'hover:bg-gray-700' : 'hover:bg-gray-100'} transition-colors`}>
+                      <ChevronLeftIcon className="w-5 h-5" />
+                    </button>
+                    <div className="text-center">
+                      <h2 className="text-xl font-bold">{monthName} {year}</h2>
+                      <p className={`text-sm ${textMuted}`}>{today.toLocaleDateString()}</p>
+                    </div>
+                    <div className="flex gap-2">
+                      <button onClick={gotoToday} className={`px-4 py-2 rounded-lg ${darkMode ? 'hover:bg-gray-700' : 'hover:bg-gray-100'} transition-colors text-sm`}>
+                        Today
+                      </button>
+                      <button onClick={nextMonth} className={`p-2 rounded-lg ${darkMode ? 'hover:bg-gray-700' : 'hover:bg-gray-100'} transition-colors`}>
+                        <ChevronRightIcon className="w-5 h-5" />
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="p-4">
+                    <div className="grid grid-cols-7 gap-2 mb-2">
+                      {['Sat', 'Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri'].map(day => (
+                        <div key={day} className="text-center text-sm font-semibold py-2">
+                          {day}
+                        </div>
+                      ))}
+                    </div>
+
+                    <div className="grid grid-cols-7 gap-2">
+                      {calendarWeeks.map((week, weekIdx) =>
+                        week.map((day, dayIdx) => {
+                          if (!day) {
+                            return <div key={`${weekIdx}-${dayIdx}`} className="aspect-square" />;
+                          }
+
+                          const dailyTotal = getDailyTotal(day);
+                          const isToday = isCurrentMonth && day === today.getDate();
+                          const hasTransactions = dailyTotal !== 0;
+                          const isSelected = selectedDate === day;
+
+                          let cellBg = darkMode ? 'bg-gray-700' : 'bg-gray-100';
+                          if (isToday) {
+                            cellBg = 'bg-orange-500';
+                          } else if (isSelected) {
+                            cellBg = 'bg-blue-500';
+                          } else if (hasTransactions) {
+                            cellBg = dailyTotal > 0
+                              ? (darkMode ? 'bg-green-900' : 'bg-green-100')
+                              : (darkMode ? 'bg-red-900' : 'bg-red-100');
+                          }
+
+                          return (
+                            <button
+                              key={`${weekIdx}-${dayIdx}`}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setSelectedDate(day);
+                                setShowDayModal(true);
+                              }}
+                              onContextMenu={(e) => {
+                                e.stopPropagation();
+                                handleRightClick(e, day);
+                              }}
+                              className={`aspect-square rounded-lg p-2 transition-all hover:scale-105 ${cellBg} ${
+                                isToday || isSelected ? 'text-white font-bold ring-2 ring-offset-2 ring-blue-400' : ''
+                              }`}
+                            >
+                              <div className="text-sm font-semibold">{day}</div>
+                              {hasTransactions && (
+                                <div className={`text-xs mt-1 ${isToday || isSelected ? 'text-white' : dailyTotal > 0 ? 'text-green-600' : 'text-red-600'}`}>
+                                  ${Math.abs(dailyTotal).toFixed(0)}
+                                </div>
+                              )}
+                            </button>
+                          );
+                        })
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {activeView === 'transactions' && (
+                <div className={`${cardBg} rounded-lg border ${borderClass} shadow-sm p-6`}>
+                  <h2 className="text-xl font-bold mb-4">Transaction Management</h2>
+                  <div className="space-y-2">
+                    {transactions.map(t => (
+                      <div key={t.id} className={`p-4 rounded-lg ${darkMode ? 'bg-gray-700' : 'bg-gray-100'} flex justify-between items-center`}>
+                        <div>
+                          <p className="font-semibold">{t.name}</p>
+                          <p className={`text-sm ${textMuted}`}>
+                            {t.frequency} • {t.category}
+                          </p>
+                        </div>
+                        <div className="text-right">
+                          <p className={`text-lg font-bold ${t.type === 'income' ? 'text-green-500' : 'text-red-500'}`}>
+                            {t.type === 'income' ? '+' : '-'}${t.amount}
+                          </p>
+                          <p className={`text-xs ${textMuted}`}>{t.type}</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {activeView === 'analytics' && (
+                <div className="space-y-6">
+                  <div className={`${cardBg} rounded-lg border ${borderClass} shadow-sm p-6`}>
+                    <h2 className="text-xl font-bold mb-4">Monthly Expense Distribution</h2>
+                    {categoryData.length > 0 ? (
+                      <ResponsiveContainer width="100%" height={400}>
+                        <RechartsPieChart>
+                          <Pie
+                            data={categoryData}
+                            cx="50%"
+                            cy="50%"
+                            labelLine={true}
+                            label={({name, percent}) => `${name}: ${(percent * 100).toFixed(0)}%`}
+                            outerRadius={120}
+                            fill="#8884d8"
+                            dataKey="value"
+                          >
+                            {categoryData.map((entry, index) => (
+                              <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                            ))}
+                          </Pie>
+                          <Tooltip
+                            contentStyle={{
+                              backgroundColor: darkMode ? '#1f2937' : '#ffffff',
+                              border: `1px solid ${darkMode ? '#374151' : '#e5e7eb'}`,
+                              color: darkMode ? '#ffffff' : '#000000'
+                            }}
+                            formatter={(value) => `$${Number(value).toLocaleString()}`}
+                          />
+                          <Legend />
+                        </RechartsPieChart>
+                      </ResponsiveContainer>
+                    ) : (
+                      <div className="text-center py-12">
+                        <p className={textMuted}>No expense data for this month</p>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className={`${cardBg} rounded-lg border ${borderClass} shadow-sm p-6`}>
+                    <h2 className="text-xl font-bold mb-4">Expense Breakdown</h2>
+                    <ResponsiveContainer width="100%" height={300}>
+                      <BarChart data={categoryData}>
+                        <CartesianGrid strokeDasharray="3 3" stroke={darkMode ? '#374151' : '#e5e7eb'} />
+                        <XAxis dataKey="name" stroke={darkMode ? '#9ca3af' : '#6b7280'} />
+                        <YAxis stroke={darkMode ? '#9ca3af' : '#6b7280'} />
+                        <Tooltip
+                          contentStyle={{
+                            backgroundColor: darkMode ? '#1f2937' : '#ffffff',
+                            border: `1px solid ${darkMode ? '#374151' : '#e5e7eb'}`,
+                            color: darkMode ? '#ffffff' : '#000000'
+                          }}
+                          formatter={(value) => `$${Number(value).toLocaleString()}`}
+                        />
+                        <Bar dataKey="value" fill="#3b82f6" />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+
+                  <div className={`${cardBg} rounded-lg border ${borderClass} shadow-sm p-6`}>
+                    <h2 className="text-xl font-bold mb-4">Income vs Expenses</h2>
+                    <ResponsiveContainer width="100%" height={300}>
+                      <BarChart data={[
+                        { name: 'Income', value: monthlyTotals.income, fill: '#4CAF50' },
+                        { name: 'Expenses', value: monthlyTotals.expenses, fill: '#F44336' }
+                      ]}>
+                        <CartesianGrid strokeDasharray="3 3" stroke={darkMode ? '#374151' : '#e5e7eb'} />
+                        <XAxis dataKey="name" stroke={darkMode ? '#9ca3af' : '#6b7280'} />
+                        <YAxis stroke={darkMode ? '#9ca3af' : '#6b7280'} />
+                        <Tooltip
+                          contentStyle={{
+                            backgroundColor: darkMode ? '#1f2937' : '#ffffff',
+                            border: `1px solid ${darkMode ? '#374151' : '#e5e7eb'}`,
+                            color: darkMode ? '#ffffff' : '#000000'
+                          }}
+                          formatter={(value) => `$${Number(value).toLocaleString()}`}
+                        />
+                        <Bar dataKey="value" />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+
+                  <div className={`${cardBg} rounded-lg border ${borderClass} shadow-sm p-6`}>
+                    <h2 className="text-xl font-bold mb-4">Cryptocurrency Portfolio Distribution</h2>
+                    {cryptoPieData.length > 0 ? (
+                      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                        <div>
+                          <ResponsiveContainer width="100%" height={300}>
+                            <RechartsPieChart>
+                              <Pie
+                                data={cryptoPieData}
+                                cx="50%"
+                                cy="50%"
+                                labelLine={true}
+                                label={({name, percent}) => `${name}: ${(percent * 100).toFixed(1)}%`}
+                                outerRadius={100}
+                                fill="#8884d8"
+                                dataKey="value"
+                              >
+                                {cryptoPieData.map((entry, index) => (
+                                  <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                                ))}
+                              </Pie>
+                              <Tooltip
+                                contentStyle={{
+                                  backgroundColor: darkMode ? '#1f2937' : '#ffffff',
+                                  border: `1px solid ${darkMode ? '#374151' : '#e5e7eb'}`,
+                                  color: darkMode ? '#ffffff' : '#000000'
+                                }}
+                                formatter={(value) => `$${Number(value).toLocaleString(undefined, {maximumFractionDigits: 0})}`}
+                              />
+                            </RechartsPieChart>
+                          </ResponsiveContainer>
+                        </div>
+
+                        <div className="space-y-3">
+                          <div className="mb-4">
+                            <p className={`text-sm ${textMuted}`}>Total Portfolio Value</p>
+                            <p className="text-3xl font-bold text-blue-500">${cryptoValue.toLocaleString(undefined, {maximumFractionDigits: 0})}</p>
+                          </div>
+                          {cryptoHoldings.map((h, index) => {
+                            const currentValue = h.amount * h.currentPrice;
+                            const costBasis = h.amount * h.purchasePrice;
+                            const profit = currentValue - costBasis;
+                            const profitPercent = costBasis === 0 ? 0 : ((profit / costBasis) * 100).toFixed(2);
+                            const portfolioPercent = cryptoValue === 0 ? 0 : ((currentValue / cryptoValue) * 100).toFixed(1);
+
+                            return (
+                              <div key={h.id} className={`p-3 rounded-lg ${darkMode ? 'bg-gray-700' : 'bg-gray-100'}`}>
+                                <div className="flex items-start gap-3">
+                                  <div
+                                    className="w-4 h-4 rounded-full mt-1 flex-shrink-0"
+                                    style={{ backgroundColor: COLORS[index % COLORS.length] }}
+                                  />
+                                  <div className="flex-1 min-w-0">
+                                    <div className="flex justify-between items-start">
+                                      <div>
+                                        <p className="font-bold">{h.symbol}</p>
+                                        <p className={`text-xs ${textMuted}`}>{h.name}</p>
+                                      </div>
+                                      <div className="text-right">
+                                        <p className="font-semibold">${currentValue.toLocaleString(undefined, {maximumFractionDigits: 0})}</p>
+                                        <p className={`text-xs ${textMuted}`}>{portfolioPercent}%</p>
+                                      </div>
+                                    </div>
+                                    <div className="mt-1 flex justify-between text-xs">
+                                      <span className={textMuted}>{h.amount} @ ${h.currentPrice.toLocaleString()}</span>
+                                      <span className={profit >= 0 ? 'text-green-500' : 'text-red-500'}>
+                                        {profit >= 0 ? '+' : ''}{profitPercent}%
+                                      </span>
+                                    </div>
+                                  </div>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="text-center py-12">
+                        <p className={textMuted}>No cryptocurrency holdings</p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+            </main>
+          </div>
+          {contextMenu && (
+            <div
+              className={`fixed ${cardBg} border ${borderClass} rounded-lg shadow-xl py-2 z-50`}
+              style={{ left: contextMenu.x, top: contextMenu.y }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <button
+                onClick={() => clearTransactionsForDay(contextMenu.day)}
+                className={`w-full px-4 py-2 text-left hover:bg-red-500 hover:text-white transition-colors flex items-center gap-2`}
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                </svg>
+                Clear Transactions for Day {contextMenu.day}
+              </button>
+            </div>
+          )}
+
+          <div
+            className={`fixed inset-0 z-40 transition-opacity duration-300 ${
+              sidebarOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'
+            }`}
+            onClick={() => setSidebarOpen(false)}
+          >
+            <div className="absolute inset-0 bg-black bg-opacity-50" />
+          </div>
+
+          <aside
+            className={`fixed top-0 left-0 h-full w-80 ${cardBg} shadow-2xl z-50 transform transition-transform duration-300 ease-in-out overflow-y-auto ${
+              sidebarOpen ? 'translate-x-0' : '-translate-x-full'
+            }`}
+          >
+            <div className={`p-4 border-b ${borderClass} flex items-center justify-between sticky top-0 ${cardBg} z-10`}>
+              <h2 className="text-xl font-bold">Menu</h2>
+              <button
+                onClick={() => setSidebarOpen(false)}
+                className={`p-2 rounded-lg transition-colors ${darkMode ? 'hover:bg-gray-700' : 'hover:bg-gray-100'}`}
+              >
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            <div className="p-4 space-y-4">
+              <div className={`${darkMode ? 'bg-gray-700' : 'bg-gray-100'} rounded-lg p-4`}>
+                <h3 className="text-sm font-semibold mb-3 flex items-center gap-2">
+                  <CalendarIcon className="w-4 h-4" />
+                  Monthly Summary
+                </h3>
+                <div className="space-y-2">
+                  <div className="flex justify-between items-center">
+                    <span className={`text-sm ${textMuted}`}>Income</span>
+                    <span className="text-sm font-semibold text-green-500">
+                      ${monthlyTotals.income.toLocaleString()}
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className={`text-sm ${textMuted}`}>Expenses</span>
+                    <span className="text-sm font-semibold text-red-500">
+                      ${monthlyTotals.expenses.toLocaleString()}
+                    </span>
+                  </div>
+                  <div className="pt-2 border-t border-gray-600">
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm font-semibold">Net</span>
+                      <span className={`text-sm font-bold ${monthlyTotals.net >= 0 ? 'text-green-500' : 'text-red-500'}`}>
+                        ${monthlyTotals.net >= 0 ? '+' : ''}{monthlyTotals.net.toLocaleString()}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className={`${darkMode ? 'bg-gray-700' : 'bg-gray-100'} rounded-lg p-4`}>
+                <h3 className="text-sm font-semibold mb-3 flex items-center gap-2">
+                  <PlusIcon className="w-4 h-4" />
+                  Quick Actions
+                </h3>
+                <div className="space-y-2">
+                  <button
+                    onClick={() => {
+                      setEditingTransaction({});
+                      setSidebarOpen(false);
+                    }}
+                    className="w-full px-4 py-3 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors flex items-center justify-center gap-2 font-medium"
+                  >
+                    <PlusIcon className="w-5 h-5" />
+                    Add Transaction
+                  </button>
+                  <button
+                    onClick={() => {
+                      setEditingTransaction({ type: 'income', frequency: 'bi-weekly', category: 'income' });
+                      setSidebarOpen(false);
+                    }}
+                    className="w-full px-4 py-3 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors flex items-center justify-center gap-2 font-medium"
+                  >
+                    <PlusIcon className="w-5 h-5" />
+                    Add Paycheck
+                  </button>
+                  <button
+                    onClick={() => {
+                      setEditingCrypto({});
+                      setSidebarOpen(false);
+                    }}
+                    className="w-full px-4 py-3 bg-purple-500 text-white rounded-lg hover:bg-purple-600 transition-colors flex items-center justify-center gap-2 font-medium"
+                  >
+                    <PlusIcon className="w-5 h-5" />
+                    Add Crypto
+                  </button>
+                </div>
+              </div>
+
+              <div className={`${darkMode ? 'bg-gray-700' : 'bg-gray-100'} rounded-lg p-4`}>
+                <h3 className="text-sm font-semibold mb-3">Navigation</h3>
+                <div className="space-y-1">
+                  <button
+                    onClick={() => {
+                      setActiveView('calendar');
+                      setSidebarOpen(false);
+                    }}
+                    className={`w-full px-4 py-2 rounded-lg transition-colors text-left flex items-center gap-3 ${
+                      activeView === 'calendar'
+                        ? 'bg-blue-500 text-white'
+                        : darkMode ? 'hover:bg-gray-600' : 'hover:bg-gray-200'
+                    }`}
+                  >
+                    <CalendarIcon className="w-5 h-5" />
+                    Calendar
+                  </button>
+                  <button
+                    onClick={() => {
+                      setActiveView('transactions');
+                      setSidebarOpen(false);
+                    }}
+                    className={`w-full px-4 py-2 rounded-lg transition-colors text-left flex items-center gap-3 ${
+                      activeView === 'transactions'
+                        ? 'bg-blue-500 text-white'
+                        : darkMode ? 'hover:bg-gray-600' : 'hover:bg-gray-200'
+                    }`}
+                  >
+                    <CreditCardIcon className="w-5 h-5" />
+                    Transactions
+                  </button>
+                  <button
+                    onClick={() => {
+                      setShowTransactionManager(true);
+                      setSidebarOpen(false);
+                    }}
+                    className={`w-full px-4 py-2 rounded-lg transition-colors text-left flex items-center gap-3 ${
+                      darkMode ? 'hover:bg-gray-600' : 'hover:bg-gray-200'
+                    }`}
+                  >
+                    <SettingsIcon className="w-5 h-5" />
+                    Manage All Transactions
+                  </button>
+                  <button
+                    onClick={() => {
+                      setShowCryptoManager(true);
+                      setSidebarOpen(false);
+                    }}
+                    className={`w-full px-4 py-2 rounded-lg transition-colors text-left flex items-center gap-3 ${
+                      darkMode ? 'hover:bg-gray-600' : 'hover:bg-gray-200'
+                    }`}
+                  >
+                    <DollarSignIcon className="w-5 h-5" />
+                    Manage Crypto Holdings
+                  </button>
+                  <button
+                    onClick={() => {
+                      setActiveView('analytics');
+                      setSidebarOpen(false);
+                    }}
+                    className={`w-full px-4 py-2 rounded-lg transition-colors text-left flex items-center gap-3 ${
+                      activeView === 'analytics'
+                        ? 'bg-blue-500 text-white'
+                        : darkMode ? 'hover:bg-gray-600' : 'hover:bg-gray-200'
+                    }`}
+                  >
+                    <PieChartIcon className="w-5 h-5" />
+                    Analytics
+                  </button>
+                </div>
+              </div>
+
+              <div className={`${darkMode ? 'bg-gray-700' : 'bg-gray-100'} rounded-lg p-4`}>
+                <h3 className="text-sm font-semibold mb-3 flex items-center gap-2">
+                  <SettingsIcon className="w-4 h-4" />
+                  Settings
+                </h3>
+                <div className="space-y-2">
+                  <button
+                    onClick={() => {
+                      const newBalance = prompt('Enter current balance:', currentBalance);
+                      if (newBalance !== null) {
+                        setCurrentBalance(parseFloat(newBalance) || 0);
+                      }
+                    }}
+                    className={`w-full px-4 py-2 rounded-lg transition-colors text-left ${darkMode ? 'hover:bg-gray-600' : 'hover:bg-gray-200'}`}
+                  >
+                    Set Current Balance
+                  </button>
+                  <button
+                    onClick={() => {
+                      setSidebarOpen(false);
+                      exportBudgie();
+                    }}
+                    className={`w-full px-4 py-2 rounded-lg transition-colors text-left ${darkMode ? 'hover:bg-gray-600' : 'hover:bg-gray-200'}`}
+                  >
+                    Save Budgie
+                  </button>
+                  <label className={`w-full px-4 py-2 rounded-lg transition-colors text-left cursor-pointer block ${darkMode ? 'hover:bg-gray-600' : 'hover:bg-gray-200'}`}>
+                    Load Budgie
+                    <input
+                      type="file"
+                      accept=".json"
+                      onChange={(e) => {
+                        importBudgie(e);
+                        setSidebarOpen(false);
+                      }}
+                      className="hidden"
+                    />
+                  </label>
+                  <button
+                    onClick={() => {
+                      if (confirm('Clear all data? This cannot be undone!')) {
+                        setTransactions([]);
+                        setCryptoHoldings([]);
+                        setCurrentBalance(0);
+                        setSidebarOpen(false);
+                      }
+                    }}
+                    className={`w-full px-4 py-2 rounded-lg transition-colors text-left text-red-500 ${darkMode ? 'hover:bg-gray-600' : 'hover:bg-gray-200'}`}
+                  >
+                    Clear All Data
+                  </button>
+                </div>
+              </div>
+
+              <div className={`${darkMode ? 'bg-gray-700' : 'bg-gray-100'} rounded-lg p-4`}>
+                <h3 className="text-sm font-semibold mb-3">Appearance</h3>
+                <button
+                  onClick={() => setDarkMode(!darkMode)}
+                  className={`w-full px-4 py-3 rounded-lg transition-colors flex items-center justify-between ${
+                    darkMode ? 'bg-gray-600 hover:bg-gray-500' : 'bg-gray-200 hover:bg-gray-300'
+                  }`}
+                >
+                  <span className="flex items-center gap-2">
+                    {darkMode ? <MoonIcon className="w-5 h-5" /> : <SunIcon className="w-5 h-5" />}
+                    <span className="font-medium">{darkMode ? 'Dark Mode' : 'Light Mode'}</span>
+                  </span>
+                  <div className={`w-12 h-6 rounded-full transition-colors ${darkMode ? 'bg-blue-500' : 'bg-gray-400'} relative`}>
+                    <div className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-transform ${darkMode ? 'translate-x-7' : 'translate-x-1'}`} />
+                  </div>
+                </button>
+              </div>
+            </div>
+          </aside>
+          {showCryptoManager && (
+            <div
+              className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"
+              onClick={() => setShowCryptoManager(false)}
+            >
+              <div
+                className={`${cardBg} rounded-lg shadow-xl w-full max-w-4xl max-h-[90vh] overflow-hidden`}
+                onClick={(e) => e.stopPropagation()}
+              >
+                <div className={`p-6 border-b ${borderClass} flex items-center justify-between`}>
+                  <h2 className="text-2xl font-bold">Manage Crypto Holdings</h2>
+                  <button
+                    onClick={() => setShowCryptoManager(false)}
+                    className={`p-2 rounded-lg hover:bg-opacity-80 transition-colors ${darkMode ? 'hover:bg-gray-700' : 'hover:bg-gray-100'}`}
+                  >
+                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                </div>
+
+                <div className="p-6 overflow-y-auto max-h-[calc(90vh-140px)]">
+                  {cryptoHoldings.length > 0 ? (
+                    <div className="space-y-3">
+                      {cryptoHoldings.map(h => {
+                        const currentValue = h.amount * h.currentPrice;
+                        const costBasis = h.amount * h.purchasePrice;
+                        const profit = currentValue - costBasis;
+                        const profitPercent = costBasis === 0 ? 0 : ((profit / costBasis) * 100).toFixed(2);
+
+                        return (
+                          <div key={h.id} className={`p-4 rounded-lg ${darkMode ? 'bg-gray-700' : 'bg-gray-100'}`}>
+                            <div className="flex justify-between items-start">
+                              <div className="flex-1">
+                                <p className="font-bold text-lg">{h.symbol}</p>
+                                <p className={`text-sm ${textMuted}`}>{h.name}</p>
+                                <p className={`text-xs ${textMuted} mt-1`}>
+                                  Amount: {h.amount} @ ${h.currentPrice.toLocaleString()}
+                                </p>
+                                <p className={`text-xs ${textMuted}`}>
+                                  Purchase: ${h.purchasePrice.toLocaleString()}
+                                </p>
+                              </div>
+                              <div className="flex flex-col gap-2 items-end">
+                                <div className="text-right">
+                                  <p className="font-bold text-xl">${currentValue.toLocaleString(undefined, {maximumFractionDigits: 0})}</p>
+                                  <p className={`text-sm ${profit >= 0 ? 'text-green-500' : 'text-red-500'}`}>
+                                    {profit >= 0 ? '+' : ''}{profitPercent}%
+                                  </p>
+                                </div>
+                                <div className="flex gap-2">
+                                  <button
+                                    onClick={() => setEditingCrypto(h)}
+                                    className="px-3 py-1 bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors text-sm"
+                                  >
+                                    Edit
+                                  </button>
+                                  <button
+                                    onClick={() => {
+                                      if (confirm(`Delete ${h.symbol}?`)) {
+                                        setCryptoHoldings(prev => prev.filter(crypto => crypto.id !== h.id));
+                                      }
+                                    }}
+                                    className="px-3 py-1 bg-red-500 text-white rounded hover:bg-red-600 transition-colors text-sm"
+                                  >
+                                    Delete
+                                  </button>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <div className="text-center py-12">
+                      <p className={`text-lg ${textMuted}`}>No crypto holdings yet</p>
+                    </div>
+                  )}
+                </div>
+
+                <div className={`p-4 border-t ${borderClass} flex justify-between gap-2`}>
+                  <button
+                    onClick={() => setEditingCrypto({})}
+                    className="px-4 py-2 bg-purple-500 text-white rounded-lg hover:bg-purple-600 transition-colors"
+                  >
+                    Add Crypto Holding
+                  </button>
+                  <button
+                    onClick={() => setShowCryptoManager(false)}
+                    className={`px-4 py-2 rounded-lg transition-colors ${darkMode ? 'bg-gray-700 hover:bg-gray-600' : 'bg-gray-200 hover:bg-gray-300'}`}
+                  >
+                    Close
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {editingCrypto && (
+            <div
+              className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"
+              onClick={() => setEditingCrypto(null)}
+            >
+              <div
+                className={`${cardBg} rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] overflow-hidden`}
+                onClick={(e) => e.stopPropagation()}
+              >
+                <div className={`p-6 border-b ${borderClass}`}>
+                  <h2 className="text-2xl font-bold">{editingCrypto.id ? 'Edit Crypto Holding' : 'Add Crypto Holding'}</h2>
+                </div>
+
+                <div className="p-6 overflow-y-auto max-h-[calc(90vh-200px)]">
+                  <div className="space-y-4">
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-sm font-semibold mb-2">Symbol</label>
+                        <input
+                          type="text"
+                          defaultValue={editingCrypto.symbol || ''}
+                          placeholder="BTC, ETH, etc."
+                          className={`w-full px-4 py-2 rounded-lg border ${borderClass} ${darkMode ? 'bg-gray-700' : 'bg-white'}`}
+                          id="crypto-symbol"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-semibold mb-2">Name</label>
+                        <input
+                          type="text"
+                          defaultValue={editingCrypto.name || ''}
+                          placeholder="Bitcoin, Ethereum, etc."
+                          className={`w-full px-4 py-2 rounded-lg border ${borderClass} ${darkMode ? 'bg-gray-700' : 'bg-white'}`}
+                          id="crypto-name"
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-semibold mb-2">Amount Held</label>
+                      <input
+                        type="number"
+                        defaultValue={editingCrypto.amount || ''}
+                        placeholder="0.00"
+                        step="0.00000001"
+                        className={`w-full px-4 py-2 rounded-lg border ${borderClass} ${darkMode ? 'bg-gray-700' : 'bg-white'}`}
+                        id="crypto-amount"
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-sm font-semibold mb-2">Purchase Price ($)</label>
+                        <input
+                          type="number"
+                          defaultValue={editingCrypto.purchasePrice || ''}
+                          placeholder="0.00"
+                          step="0.01"
+                          className={`w-full px-4 py-2 rounded-lg border ${borderClass} ${darkMode ? 'bg-gray-700' : 'bg-white'}`}
+                          id="crypto-purchase"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-semibold mb-2">Current Price ($)</label>
+                        <input
+                          type="number"
+                          defaultValue={editingCrypto.currentPrice || ''}
+                          placeholder="0.00"
+                          step="0.01"
+                          className={`w-full px-4 py-2 rounded-lg border ${borderClass} ${darkMode ? 'bg-gray-700' : 'bg-white'}`}
+                          id="crypto-current"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className={`p-4 border-t ${borderClass} flex justify-end gap-2`}>
+                  <button
+                    onClick={() => setEditingCrypto(null)}
+                    className={`px-4 py-2 rounded-lg transition-colors ${darkMode ? 'bg-gray-700 hover:bg-gray-600' : 'bg-gray-200 hover:bg-gray-300'}`}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={() => {
+                      const symbol = document.getElementById('crypto-symbol').value.toUpperCase();
+                      const name = document.getElementById('crypto-name').value;
+                      const amount = parseFloat(document.getElementById('crypto-amount').value);
+                      const purchasePrice = parseFloat(document.getElementById('crypto-purchase').value);
+                      const currentPrice = parseFloat(document.getElementById('crypto-current').value);
+
+                      if (!symbol || !name || !amount || !purchasePrice || !currentPrice) {
+                        alert('Please fill in all fields');
+                        return;
+                      }
+
+                      if (editingCrypto.id) {
+                        setCryptoHoldings(prev => prev.map(h =>
+                          h.id === editingCrypto.id
+                            ? { ...h, symbol, name, amount, purchasePrice, currentPrice }
+                            : h
+                        ));
+                      } else {
+                        const newHolding = {
+                          id: Date.now(),
+                          symbol,
+                          name,
+                          amount,
+                          purchasePrice,
+                          currentPrice
+                        };
+                        setCryptoHoldings(prev => [...prev, newHolding]);
+                      }
+                      setEditingCrypto(null);
+                    }}
+                    className="px-4 py-2 bg-purple-500 text-white rounded-lg hover:bg-purple-600 transition-colors"
+                  >
+                    {editingCrypto.id ? 'Save Changes' : 'Add Holding'}
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {showTransactionManager && (
+            <div
+              className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"
+              onClick={() => setShowTransactionManager(false)}
+            >
+              <div
+                className={`${cardBg} rounded-lg shadow-xl w-full max-w-4xl max-h-[90vh] overflow-hidden`}
+                onClick={(e) => e.stopPropagation()}
+              >
+                <div className={`p-6 border-b ${borderClass} flex items-center justify-between`}>
+                  <h2 className="text-2xl font-bold">Manage All Transactions</h2>
+                  <button
+                    onClick={() => setShowTransactionManager(false)}
+                    className={`p-2 rounded-lg hover:bg-opacity-80 transition-colors ${darkMode ? 'hover:bg-gray-700' : 'hover:bg-gray-100'}`}
+                  >
+                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                </div>
+
+                <div className="p-6 overflow-y-auto max-h-[calc(90vh-140px)]">
+                  {transactions.length > 0 ? (
+                    <div className="space-y-3">
+                      {transactions.map(t => (
+                        <div key={t.id} className={`p-4 rounded-lg ${darkMode ? 'bg-gray-700' : 'bg-gray-100'} hover:bg-opacity-80 transition-colors`}>
+                          <div className="flex justify-between items-start">
+                            <div className="flex-1">
+                              <p className="font-semibold text-lg">{t.name}</p>
+                              <div className="flex gap-4 mt-2 text-sm">
+                                <span className={textMuted}>
+                                  <strong>Type:</strong> {t.type === 'income' ? 'Income' : 'Expense'}
+                                </span>
+                                <span className={textMuted}>
+                                  <strong>Frequency:</strong> {t.frequency}
+                                </span>
+                                <span className={textMuted}>
+                                  <strong>Category:</strong> {t.category}
+                                </span>
+                              </div>
+                              <div className="flex gap-4 mt-1 text-sm">
+                                <span className={textMuted}>
+                                  <strong>Start:</strong> {t.startDate}
+                                </span>
+                              </div>
+                            </div>
+                            <div className="flex flex-col gap-2 ml-4">
+                              <div className="text-right">
+                                <p className={`text-2xl font-bold ${t.type === 'income' ? 'text-green-500' : 'text-red-500'}`}>
+                                  {t.type === 'income' ? '+' : '-'}${t.amount}
+                                </p>
+                              </div>
+                              <div className="flex gap-2">
+                                <button
+                                  onClick={() => setEditingTransaction(t)}
+                                  className="px-3 py-1 bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors text-sm"
+                                >
+                                  Edit
+                                </button>
+                                <button
+                                  onClick={() => {
+                                    if (confirm(`Delete "${t.name}"?`)) {
+                                      setTransactions(prev => prev.filter(trans => trans.id !== t.id));
+                                    }
+                                  }}
+                                  className="px-3 py-1 bg-red-500 text-white rounded hover:bg-red-600 transition-colors text-sm"
+                                >
+                                  Delete
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="text-center py-12">
+                      <p className={`text-lg ${textMuted}`}>No transactions yet</p>
+                    </div>
+                  )}
+                </div>
+
+                <div className={`p-4 border-t ${borderClass} flex justify-between gap-2`}>
+                  <button
+                    onClick={() => setEditingTransaction({})}
+                    className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
+                  >
+                    Add New Transaction
+                  </button>
+                  <button
+                    onClick={() => setShowTransactionManager(false)}
+                    className={`px-4 py-2 rounded-lg transition-colors ${darkMode ? 'bg-gray-700 hover:bg-gray-600' : 'bg-gray-200 hover:bg-gray-300'}`}
+                  >
+                    Close
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+          {editingTransaction && (
+            <div
+              className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"
+              onClick={() => setEditingTransaction(null)}
+            >
+              <div
+                className={`${cardBg} rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] overflow-hidden`}
+                onClick={(e) => e.stopPropagation()}
+              >
+                <div className={`p-6 border-b ${borderClass}`}>
+                  <h2 className="text-2xl font-bold">{editingTransaction.id ? 'Edit Transaction' : 'Add New Transaction'}</h2>
+                  {editingTransaction.id && editingTransaction.frequency !== 'one-time' && (
+                    <p className={`text-sm ${textMuted} mt-2`}>
+                      Editing this recurring transaction will affect all occurrences
+                    </p>
+                  )}
+                </div>
+
+                <div className="p-6 overflow-y-auto max-h-[calc(90vh-200px)]">
+                  <div className="space-y-4">
+                    <div>
+                      <label className="block text-sm font-semibold mb-2">Transaction Name</label>
+                      <input
+                        type="text"
+                        defaultValue={editingTransaction.name || ''}
+                        placeholder="e.g., Rent, Groceries, Salary"
+                        className={`w-full px-4 py-2 rounded-lg border ${borderClass} ${darkMode ? 'bg-gray-700' : 'bg-white'}`}
+                        id="trans-name"
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-sm font-semibold mb-2">Amount ($)</label>
+                        <input
+                          type="number"
+                          defaultValue={editingTransaction.amount || ''}
+                          placeholder="0.00"
+                          step="0.01"
+                          className={`w-full px-4 py-2 rounded-lg border ${borderClass} ${darkMode ? 'bg-gray-700' : 'bg-white'}`}
+                          id="trans-amount"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-semibold mb-2">Type</label>
+                        <select
+                          defaultValue={editingTransaction.type || 'expense'}
+                          className={`w-full px-4 py-2 rounded-lg border ${borderClass} ${darkMode ? 'bg-gray-700' : 'bg-white'}`}
+                          id="trans-type"
+                        >
+                          <option value="income">Income</option>
+                          <option value="expense">Expense</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-sm font-semibold mb-2">Frequency</label>
+                        <select
+                          defaultValue={editingTransaction.frequency || 'monthly'}
+                          className={`w-full px-4 py-2 rounded-lg border ${borderClass} ${darkMode ? 'bg-gray-700' : 'bg-white'}`}
+                          id="trans-frequency"
+                        >
+                          <option value="one-time">One-time</option>
+                          <option value="daily">Daily</option>
+                          <option value="weekly">Weekly</option>
+                          <option value="bi-weekly">Bi-weekly</option>
+                          <option value="monthly">Monthly</option>
+                          <option value="yearly">Yearly</option>
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-semibold mb-2">Category</label>
+                        <select
+                          defaultValue={editingTransaction.category || 'other'}
+                          className={`w-full px-4 py-2 rounded-lg border ${borderClass} ${darkMode ? 'bg-gray-700' : 'bg-white'}`}
+                          id="trans-category"
+                        >
+                          <option value="income">Income</option>
+                          <option value="utilities">Utilities</option>
+                          <option value="food">Food</option>
+                          <option value="entertainment">Entertainment</option>
+                          <option value="transportation">Transportation</option>
+                          <option value="savings">Savings</option>
+                          <option value="other">Other</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-semibold mb-2">Start Date</label>
+                      <input
+                        type="date"
+                        defaultValue={editingTransaction.startDate || new Date().toISOString().split('T')[0]}
+                        className={`w-full px-4 py-2 rounded-lg border ${borderClass} ${darkMode ? 'bg-gray-700' : 'bg-white'}`}
+                        id="trans-startdate"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                <div className={`p-4 border-t ${borderClass} flex justify-end gap-2`}>
+                  <button
+                    onClick={() => setEditingTransaction(null)}
+                    className={`px-4 py-2 rounded-lg transition-colors ${darkMode ? 'bg-gray-700 hover:bg-gray-600' : 'bg-gray-200 hover:bg-gray-300'}`}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={() => {
+                      const name = document.getElementById('trans-name').value;
+                      const amount = parseFloat(document.getElementById('trans-amount').value);
+                      const type = document.getElementById('trans-type').value;
+                      const frequency = document.getElementById('trans-frequency').value;
+                      const category = document.getElementById('trans-category').value;
+                      const startDate = document.getElementById('trans-startdate').value;
+
+                      if (!name || !amount) {
+                        alert('Please fill in name and amount');
+                        return;
+                      }
+
+                      if (editingTransaction.id) {
+                        setTransactions(prev => prev.map(t =>
+                          t.id === editingTransaction.id
+                            ? { ...t, name, amount, type, frequency, category, startDate }
+                            : t
+                        ));
+                      } else {
+                        const newTransaction = {
+                          id: Date.now(),
+                          name,
+                          amount,
+                          type,
+                          frequency,
+                          category,
+                          startDate
+                        };
+                        setTransactions(prev => [...prev, newTransaction]);
+                      }
+                      setEditingTransaction(null);
+                    }}
+                    className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
+                  >
+                    {editingTransaction.id ? 'Save Changes' : 'Add Transaction'}
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {showDayModal && selectedDate && (
+            <div
+              className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"
+              onClick={() => setShowDayModal(false)}
+            >
+              <div
+                className={`${cardBg} rounded-lg shadow-xl max-w-2xl w-full max-h-[80vh] overflow-hidden`}
+                onClick={(e) => e.stopPropagation()}
+              >
+                <div className={`p-6 border-b ${borderClass} flex items-center justify-between`}>
+                  <div>
+                    <h3 className="text-2xl font-bold">
+                      {new Date(year, month, selectedDate).toLocaleDateString('default', {
+                        weekday: 'long',
+                        month: 'long',
+                        day: 'numeric',
+                        year: 'numeric'
+                      })}
+                    </h3>
+                    <p className={`text-sm ${textMuted} mt-1`}>
+                      Daily Total: <span className={`font-semibold ${getDailyTotal(selectedDate) >= 0 ? 'text-green-500' : 'text-red-500'}`}>
+                        ${getDailyTotal(selectedDate) >= 0 ? '+' : ''}{getDailyTotal(selectedDate).toLocaleString()}
+                      </span>
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => setShowDayModal(false)}
+                    className={`p-2 rounded-lg hover:bg-opacity-80 transition-colors ${darkMode ? 'hover:bg-gray-700' : 'hover:bg-gray-100'}`}
+                  >
+                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                </div>
+
+                <div className="p-6 overflow-y-auto max-h-[calc(80vh-140px)]">
+                  {getTransactionsForDate(selectedDate).length > 0 ? (
+                    <div className="space-y-3">
+                      {getTransactionsForDate(selectedDate).map(t => (
+                        <div key={t.id} className={`p-4 rounded-lg ${darkMode ? 'bg-gray-700' : 'bg-gray-100'} hover:bg-opacity-80 transition-colors`}>
+                          <div className="flex justify-between items-start">
+                            <div className="flex-1">
+                              <p className="font-semibold text-lg">{t.name}</p>
+                              <div className="flex gap-4 mt-2">
+                                <span className={`text-sm ${textMuted}`}>
+                                  {t.frequency}
+                                </span>
+                                <span className={`text-sm ${textMuted}`}>
+                                  {t.category}
+                                </span>
+                              </div>
+                            </div>
+                            <div className="flex flex-col gap-2 items-end">
+                              <p className={`text-2xl font-bold ${t.type === 'income' ? 'text-green-500' : 'text-red-500'}`}>
+                                {t.type === 'income' ? '+' : '-'}${t.amount}
+                              </p>
+                              <button
+                                onClick={() => {
+                                  setShowDayModal(false);
+                                  setEditingTransaction(t);
+                                }}
+                                className="text-xs px-3 py-1 bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors"
+                              >
+                                Edit
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="text-center py-12">
+                      <CalendarIcon className={`w-16 h-16 mx-auto mb-4 ${textMuted}`} />
+                      <p className={`text-lg ${textMuted}`}>No transactions scheduled for this day</p>
+                      <button
+                        onClick={() => {
+                          setShowDayModal(false);
+                          setEditingTransaction({
+                            startDate: new Date(year, month, selectedDate).toISOString().split('T')[0],
+                            frequency: 'one-time'
+                          });
+                        }}
+                        className="mt-4 px-6 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
+                      >
+                        Add Transaction
+                      </button>
+                    </div>
+                  )}
+                </div>
+
+                <div className={`p-4 border-t ${borderClass} flex justify-end gap-2`}>
+                  <button
+                    onClick={() => {
+                      setShowDayModal(false);
+                      setEditingTransaction({
+                        startDate: new Date(year, month, selectedDate).toISOString().split('T')[0],
+                        frequency: 'one-time'
+                      });
+                    }}
+                    className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
+                  >
+                    Add Transaction for This Day
+                  </button>
+                  <button
+                    onClick={() => setShowDayModal(false)}
+                    className={`px-4 py-2 rounded-lg transition-colors ${darkMode ? 'bg-gray-700 hover:bg-gray-600' : 'bg-gray-200 hover:bg-gray-300'}`}
+                  >
+                    Close
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      );
+    };
+
+    ReactDOM.createRoot(document.getElementById('root')).render(<BudgieApp />);
+  </script>
+</body>
+</html>
