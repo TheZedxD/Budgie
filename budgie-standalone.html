@@ -27,6 +27,13 @@
 
   <script type="text/babel">
     const { useState, useMemo, useEffect } = React;
+    const RechartsGlobal = window.Recharts;
+    if (!RechartsGlobal) {
+      throw new Error(
+        'Recharts library failed to load. Please check the CDN URL or network connection.'
+      );
+    }
+
     const {
       ResponsiveContainer,
       PieChart: RechartsPieChart,
@@ -39,7 +46,7 @@
       CartesianGrid,
       XAxis,
       YAxis
-    } = Recharts;
+    } = RechartsGlobal;
 
     const IconBase = ({ children, className = "", viewBox = "0 0 24 24" }) => (
       <svg
