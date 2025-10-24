@@ -1,0 +1,404 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Budgie Tests</title>
+    <style>
+        body {
+            font-family: system-ui, -apple-system, sans-serif;
+            max-width: 1200px;
+            margin: 40px auto;
+            padding: 0 20px;
+            background: #f5f5f5;
+        }
+        .test-section {
+            background: white;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .test-section h2 {
+            margin-top: 0;
+            border-bottom: 2px solid #333;
+            padding-bottom: 10px;
+        }
+        .test-case {
+            padding: 10px;
+            margin: 5px 0;
+            border-left: 4px solid #ccc;
+            background: #f9f9f9;
+        }
+        .test-case.pass {
+            border-left-color: #4caf50;
+            background: #e8f5e9;
+        }
+        .test-case.fail {
+            border-left-color: #f44336;
+            background: #ffebee;
+        }
+        .test-name {
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+        .test-result {
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+        }
+        .summary {
+            font-size: 18px;
+            font-weight: bold;
+            margin: 20px 0;
+            padding: 15px;
+            background: #e3f2fd;
+            border-radius: 4px;
+        }
+        .summary.all-pass {
+            background: #e8f5e9;
+            color: #2e7d32;
+        }
+        .summary.has-fail {
+            background: #ffebee;
+            color: #c62828;
+        }
+    </style>
+</head>
+<body>
+    <h1>Budgie Test Suite</h1>
+    <div id="results"></div>
+
+    <script>
+        // Extract occursOnDate function from app.js
+        const DAY_IN_MS = 24 * 60 * 60 * 1000;
+
+        function occursOnDate(transaction, target) {
+            const start = typeof transaction.date === 'string'
+                ? new Date(transaction.date)
+                : transaction.date;
+
+            if (!target || !start) {
+                return false;
+            }
+
+            const daysDiff = Math.round((target.getTime() - start.getTime()) / DAY_IN_MS);
+            if (Number.isNaN(daysDiff) || daysDiff < 0) {
+                return false;
+            }
+
+            switch (transaction.frequency) {
+                case 'once':
+                    return daysDiff === 0;
+                case 'daily':
+                    return true;
+                case 'weekly':
+                    return daysDiff % 7 === 0;
+                case 'biweekly':
+                    return daysDiff % 14 === 0;
+                case 'monthly': {
+                    if (target.getDate() === start.getDate()) return true;
+                    const last = new Date(target.getFullYear(), target.getMonth() + 1, 0).getDate();
+                    if (start.getDate() > last) return target.getDate() === last;
+                    return false;
+                }
+                default:
+                    return false;
+            }
+        }
+
+        // Test runner
+        const testResults = [];
+        const asyncTests = [];
+
+        function runTest(name, fn) {
+            try {
+                const result = fn();
+
+                // Handle async tests (promises)
+                if (result && typeof result.then === 'function') {
+                    asyncTests.push(
+                        result.then(asyncResult => {
+                            testResults.push({ name, passed: asyncResult.passed, message: asyncResult.message });
+                        }).catch(error => {
+                            testResults.push({ name, passed: false, message: `Error: ${error.message}` });
+                        })
+                    );
+                } else {
+                    // Sync test
+                    testResults.push({ name, passed: result.passed, message: result.message });
+                }
+            } catch (error) {
+                testResults.push({ name, passed: false, message: `Error: ${error.message}` });
+            }
+        }
+
+        function assert(condition, message) {
+            return { passed: condition, message: condition ? 'PASS' : `FAIL: ${message}` };
+        }
+
+        // Monthly Recurrence Edge Case Tests
+        runTest('Jan 31 → Feb 28 (non-leap year)', () => {
+            const transaction = { date: new Date(2023, 0, 31), frequency: 'monthly' };
+            const target = new Date(2023, 1, 28);
+            const result = occursOnDate(transaction, target);
+            return assert(result === true, 'Should occur on Feb 28 when starting on Jan 31 (non-leap year)');
+        });
+
+        runTest('Jan 31 → Feb 29 (leap year)', () => {
+            const transaction = { date: new Date(2024, 0, 31), frequency: 'monthly' };
+            const target = new Date(2024, 1, 29);
+            const result = occursOnDate(transaction, target);
+            return assert(result === true, 'Should occur on Feb 29 when starting on Jan 31 (leap year)');
+        });
+
+        runTest('Mar 31 → Apr 30', () => {
+            const transaction = { date: new Date(2023, 2, 31), frequency: 'monthly' };
+            const target = new Date(2023, 3, 30);
+            const result = occursOnDate(transaction, target);
+            return assert(result === true, 'Should occur on Apr 30 when starting on Mar 31');
+        });
+
+        runTest('Jan 30 → Feb 28 (non-leap year)', () => {
+            const transaction = { date: new Date(2023, 0, 30), frequency: 'monthly' };
+            const target = new Date(2023, 1, 28);
+            const result = occursOnDate(transaction, target);
+            return assert(result === true, 'Should occur on Feb 28 when starting on Jan 30 (non-leap year)');
+        });
+
+        runTest('Jan 30 → Feb 29 (leap year)', () => {
+            const transaction = { date: new Date(2024, 0, 30), frequency: 'monthly' };
+            const target = new Date(2024, 1, 29);
+            const result = occursOnDate(transaction, target);
+            return assert(result === true, 'Should occur on Feb 29 when starting on Jan 30 (leap year)');
+        });
+
+        runTest('Jan 30 → Mar 30', () => {
+            const transaction = { date: new Date(2023, 0, 30), frequency: 'monthly' };
+            const target = new Date(2023, 2, 30);
+            const result = occursOnDate(transaction, target);
+            return assert(result === true, 'Should occur on Mar 30 when starting on Jan 30');
+        });
+
+        runTest('Jan 30 → Apr 30', () => {
+            const transaction = { date: new Date(2023, 0, 30), frequency: 'monthly' };
+            const target = new Date(2023, 3, 30);
+            const result = occursOnDate(transaction, target);
+            return assert(result === true, 'Should occur on Apr 30 when starting on Jan 30');
+        });
+
+        runTest('Jan 30 → May 30', () => {
+            const transaction = { date: new Date(2023, 0, 30), frequency: 'monthly' };
+            const target = new Date(2023, 4, 30);
+            const result = occursOnDate(transaction, target);
+            return assert(result === true, 'Should occur on May 30 when starting on Jan 30');
+        });
+
+        // Normal day regression tests (1-28)
+        runTest('Jan 15 → Feb 15', () => {
+            const transaction = { date: new Date(2023, 0, 15), frequency: 'monthly' };
+            const target = new Date(2023, 1, 15);
+            const result = occursOnDate(transaction, target);
+            return assert(result === true, 'Should occur on Feb 15 when starting on Jan 15');
+        });
+
+        runTest('Jan 1 → Feb 1', () => {
+            const transaction = { date: new Date(2023, 0, 1), frequency: 'monthly' };
+            const target = new Date(2023, 1, 1);
+            const result = occursOnDate(transaction, target);
+            return assert(result === true, 'Should occur on Feb 1 when starting on Jan 1');
+        });
+
+        runTest('Jan 28 → Feb 28', () => {
+            const transaction = { date: new Date(2023, 0, 28), frequency: 'monthly' };
+            const target = new Date(2023, 1, 28);
+            const result = occursOnDate(transaction, target);
+            return assert(result === true, 'Should occur on Feb 28 when starting on Jan 28');
+        });
+
+        runTest('Jan 15 → wrong day (Feb 14)', () => {
+            const transaction = { date: new Date(2023, 0, 15), frequency: 'monthly' };
+            const target = new Date(2023, 1, 14);
+            const result = occursOnDate(transaction, target);
+            return assert(result === false, 'Should NOT occur on Feb 14 when starting on Jan 15');
+        });
+
+        runTest('Jan 31 → wrong day (Feb 27)', () => {
+            const transaction = { date: new Date(2023, 0, 31), frequency: 'monthly' };
+            const target = new Date(2023, 1, 27);
+            const result = occursOnDate(transaction, target);
+            return assert(result === false, 'Should NOT occur on Feb 27 when starting on Jan 31');
+        });
+
+        // Balance/Cache Stress Tests
+        runTest('Stress Test: stateManager batching and versioning', () => {
+            // Simulate the stateManager from app.js
+            const testCache = {
+                version: 0,
+                transactionsByDate: new Map(),
+                balanceByDate: new Map(),
+                balanceComputedUntil: null
+            };
+
+            const testState = {
+                cacheVersion: 0,
+                transactions: []
+            };
+
+            const testStateManager = (() => {
+                let opId = 0;
+                let pendingBatch = null;
+                let batchCallbacks = [];
+
+                function applyChange(fn) {
+                    batchCallbacks.push(fn);
+
+                    if (!pendingBatch) {
+                        pendingBatch = Promise.resolve().then(() => {
+                            const callbacks = batchCallbacks.slice();
+                            batchCallbacks = [];
+                            pendingBatch = null;
+
+                            // Execute all batched mutations
+                            callbacks.forEach(cb => cb());
+
+                            // Increment opId and invalidate caches
+                            opId += 1;
+                            testState.cacheVersion = opId;
+                            testCache.version = opId;
+                            testCache.transactionsByDate.clear();
+                            testCache.balanceByDate.clear();
+                            testCache.balanceComputedUntil = null;
+                        });
+                    }
+
+                    return pendingBatch;
+                }
+
+                function assertVersion(expectedVersion) {
+                    if (testCache.version !== expectedVersion) {
+                        throw new Error(`Cache version mismatch: expected ${expectedVersion}, got ${testCache.version}`);
+                    }
+                }
+
+                function getCurrentVersion() {
+                    return testCache.version;
+                }
+
+                return {
+                    applyChange,
+                    assertVersion,
+                    getCurrentVersion
+                };
+            })();
+
+            // Test 1: Batching multiple synchronous operations
+            let operations = 0;
+            testStateManager.applyChange(() => { operations++; });
+            testStateManager.applyChange(() => { operations++; });
+            testStateManager.applyChange(() => { operations++; });
+
+            // Operations should not have executed yet (microtask pending)
+            if (operations !== 0) {
+                return assert(false, 'Operations should be batched and not execute immediately');
+            }
+
+            // Return a promise to wait for the microtask
+            return Promise.resolve().then(() => {
+                // All operations should have executed in a single batch
+                if (operations !== 3) {
+                    return assert(false, `Expected 3 operations, got ${operations}`);
+                }
+
+                // Version should have incremented once (not three times)
+                if (testCache.version !== 1) {
+                    return assert(false, `Expected version 1, got ${testCache.version}`);
+                }
+
+                // Test 2: Version assertion
+                const currentVersion = testStateManager.getCurrentVersion();
+                try {
+                    testStateManager.assertVersion(currentVersion);
+                } catch (e) {
+                    return assert(false, 'assertVersion should not throw for matching version');
+                }
+
+                // Test 3: Rapid sequential operations
+                const promises = [];
+                for (let i = 0; i < 100; i++) {
+                    promises.push(testStateManager.applyChange(() => {
+                        testState.transactions.push({ id: i, amount: Math.random() * 1000 });
+                    }));
+                }
+
+                return Promise.all(promises).then(() => {
+                    if (testState.transactions.length !== 100) {
+                        return assert(false, `Expected 100 transactions, got ${testState.transactions.length}`);
+                    }
+
+                    // Version should have incremented multiple times
+                    if (testCache.version < 2) {
+                        return assert(false, `Expected version >= 2, got ${testCache.version}`);
+                    }
+
+                    // Cache should be cleared after operations
+                    if (testCache.transactionsByDate.size !== 0 || testCache.balanceByDate.size !== 0) {
+                        return assert(false, 'Caches should be cleared after state mutations');
+                    }
+
+                    return assert(true, 'Batching, versioning, and cache invalidation working correctly');
+                });
+            });
+        });
+
+        // Render results
+        function renderResults() {
+            const container = document.getElementById('results');
+            const passed = testResults.filter(t => t.passed).length;
+            const total = testResults.length;
+
+            const summaryClass = passed === total ? 'all-pass' : 'has-fail';
+            let html = `<div class="summary ${summaryClass}">Test Results: ${passed}/${total} passed</div>`;
+
+            // Group tests by category
+            const monthlyTests = testResults.filter((_, i) => i < 8);
+            const regressionTests = testResults.filter((_, i) => i >= 8 && i < 13);
+            const stressTests = testResults.filter((_, i) => i >= 13);
+
+            function renderSection(title, tests) {
+                if (tests.length === 0) return '';
+
+                let section = `<div class="test-section">
+                    <h2>${title}</h2>`;
+
+                tests.forEach(test => {
+                    const status = test.passed ? 'pass' : 'fail';
+                    section += `
+                        <div class="test-case ${status}">
+                            <div class="test-name">${test.name}</div>
+                            <div class="test-result">${test.message}</div>
+                        </div>
+                    `;
+                });
+
+                section += '</div>';
+                return section;
+            }
+
+            html += renderSection('Monthly Recurrence Edge Cases', monthlyTests);
+            html += renderSection('Regression Tests (Days 1-28)', regressionTests);
+            html += renderSection('Balance/Cache Stress Tests', stressTests);
+
+            container.innerHTML = html;
+        }
+
+        // Wait for async tests to complete, then render
+        if (asyncTests.length > 0) {
+            Promise.all(asyncTests).then(() => {
+                renderResults();
+            });
+        } else {
+            renderResults();
+        }
+    </script>
+</body>
+</html>

@@ -442,6 +442,54 @@
         }
     }
 
+    // Centralized state mutation manager to prevent race conditions
+    const stateManager = (() => {
+        let opId = 0;
+        let pendingBatch = null;
+        let batchCallbacks = [];
+
+        function applyChange(fn) {
+            batchCallbacks.push(fn);
+
+            if (!pendingBatch) {
+                pendingBatch = Promise.resolve().then(() => {
+                    const callbacks = batchCallbacks.slice();
+                    batchCallbacks = [];
+                    pendingBatch = null;
+
+                    // Execute all batched mutations
+                    callbacks.forEach(cb => cb());
+
+                    // Increment opId and invalidate caches
+                    opId += 1;
+                    state.cacheVersion = opId;
+                    cache.version = opId;
+                    cache.transactionsByDate.clear();
+                    cache.balanceByDate.clear();
+                    cache.balanceComputedUntil = null;
+                });
+            }
+
+            return pendingBatch;
+        }
+
+        function assertVersion(expectedVersion) {
+            if (cache.version !== expectedVersion) {
+                throw new Error(`Cache version mismatch: expected ${expectedVersion}, got ${cache.version}`);
+            }
+        }
+
+        function getCurrentVersion() {
+            return cache.version;
+        }
+
+        return {
+            applyChange,
+            assertVersion,
+            getCurrentVersion
+        };
+    })();
+
     function formatDateKey(date) {
         return [
             date.getFullYear(),
@@ -856,16 +904,12 @@
                 return daysDiff % 7 === 0;
             case 'biweekly':
                 return daysDiff % 14 === 0;
-            case 'monthly':
-                if (target.getDate() === start.getDate()) {
-                    return true;
-                }
-                // If the original date is near the end of the month, allow it to fall on the final day of shorter months.
-                if (start.getDate() > 28) {
-                    const lastDayOfTargetMonth = new Date(target.getFullYear(), target.getMonth() + 1, 0).getDate();
-                    return target.getDate() === lastDayOfTargetMonth && start.getDate() > lastDayOfTargetMonth;
-                }
+            case 'monthly': {
+                if (target.getDate() === start.getDate()) return true;
+                const last = new Date(target.getFullYear(), target.getMonth() + 1, 0).getDate();
+                if (start.getDate() > last) return target.getDate() === last;
                 return false;
+            }
             default:
                 return false;
         }
