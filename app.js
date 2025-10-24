@@ -230,6 +230,12 @@
         }
     };
 
+    // Modal accessibility state for focus management
+    const modalAccessibility = {
+        previouslyFocusedElement: null,
+        activeModal: null
+    };
+
     const tooltipManager = (() => {
         const state = {
             element: null,
@@ -924,21 +930,92 @@
         elements.overlay.classList.toggle('active', Boolean(panelOpen || modalOpen));
     }
 
+    // Helper function to get all focusable elements in a modal
+    function getFocusableElements(modal) {
+        if (!modal) return [];
+        const selector = 'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])';
+        return Array.from(modal.querySelectorAll(selector)).filter(el => {
+            return !el.disabled && el.offsetParent !== null;
+        });
+    }
+
+    // Tab trap handler for modal accessibility
+    function handleModalTabTrap(event, modal) {
+        if (event.key !== 'Tab') return;
+
+        const focusableElements = getFocusableElements(modal);
+        if (focusableElements.length === 0) return;
+
+        const firstElement = focusableElements[0];
+        const lastElement = focusableElements[focusableElements.length - 1];
+
+        if (event.shiftKey) {
+            // Shift+Tab: if on first element, wrap to last
+            if (document.activeElement === firstElement) {
+                event.preventDefault();
+                lastElement.focus();
+            }
+        } else {
+            // Tab: if on last element, wrap to first
+            if (document.activeElement === lastElement) {
+                event.preventDefault();
+                firstElement.focus();
+            }
+        }
+    }
+
     function openModal(modal) {
         if (!modal) {
             return;
         }
+
+        // Save previously focused element
+        modalAccessibility.previouslyFocusedElement = document.activeElement;
+        modalAccessibility.activeModal = modal;
+
         tooltipManager.hide();
         hideHistoricalReportsTooltip();
         modal.classList.add('active');
         setOverlayVisibility();
+
+        // Focus first focusable element in modal
+        window.requestAnimationFrame(() => {
+            const focusableElements = getFocusableElements(modal);
+            if (focusableElements.length > 0) {
+                focusableElements[0].focus();
+            }
+        });
+
+        // Add tab trap listener
+        const tabTrapHandler = (event) => handleModalTabTrap(event, modal);
+        modal.addEventListener('keydown', tabTrapHandler);
+        modal._tabTrapHandler = tabTrapHandler;
     }
 
     function closeModal(modal) {
         if (!modal) {
             return;
         }
+
         modal.classList.remove('active');
+
+        // Remove tab trap listener
+        if (modal._tabTrapHandler) {
+            modal.removeEventListener('keydown', modal._tabTrapHandler);
+            delete modal._tabTrapHandler;
+        }
+
+        // Restore previously focused element
+        if (modalAccessibility.activeModal === modal) {
+            if (modalAccessibility.previouslyFocusedElement && typeof modalAccessibility.previouslyFocusedElement.focus === 'function') {
+                window.requestAnimationFrame(() => {
+                    modalAccessibility.previouslyFocusedElement.focus();
+                });
+            }
+            modalAccessibility.previouslyFocusedElement = null;
+            modalAccessibility.activeModal = null;
+        }
+
         if (modal === elements.modals.reports.root) {
             reportsState.line.hoverIndex = null;
             reportsState.pie.hoverIndex = null;
@@ -1255,11 +1332,43 @@
             .sort((a, b) => b.value - a.value);
     }
 
+    // Resize canvas with devicePixelRatio scaling for crisp rendering
+    function resizeCanvas(canvas) {
+        if (!canvas) return;
+
+        const container = canvas.parentElement;
+        if (!container) return;
+
+        const dpr = window.devicePixelRatio || 1;
+        const rect = container.getBoundingClientRect();
+
+        // Set display size (CSS pixels)
+        const displayWidth = rect.width;
+        const displayHeight = rect.height || displayWidth * 0.6; // Default aspect ratio
+
+        // Set actual size in memory (scaled for device pixel ratio)
+        canvas.width = displayWidth * dpr;
+        canvas.height = displayHeight * dpr;
+
+        // Scale the context to match device pixel ratio
+        const ctx = canvas.getContext('2d');
+        if (ctx) {
+            ctx.scale(dpr, dpr);
+        }
+
+        // Set CSS size
+        canvas.style.width = `${displayWidth}px`;
+        canvas.style.height = `${displayHeight}px`;
+    }
+
     function renderReportsLineChart() {
         const modal = elements.modals.reports;
         if (!modal?.lineCanvas) {
             return;
         }
+
+        // Resize canvas for responsive rendering
+        resizeCanvas(modal.lineCanvas);
 
         const ctx = modal.lineCanvas.getContext('2d');
         if (!ctx) {
@@ -1456,6 +1565,9 @@
         if (!modal?.pieCanvas) {
             return;
         }
+
+        // Resize canvas for responsive rendering
+        resizeCanvas(modal.pieCanvas);
 
         const ctx = modal.pieCanvas.getContext('2d');
         if (!ctx) {
@@ -1867,6 +1979,10 @@
         if (!modal || !canvas) {
             return;
         }
+
+        // Resize canvas for responsive rendering
+        resizeCanvas(canvas);
+
         const ctx = canvas.getContext('2d');
         if (!ctx) {
             return;
@@ -2001,6 +2117,10 @@
         if (!modal || !canvas) {
             return;
         }
+
+        // Resize canvas for responsive rendering
+        resizeCanvas(canvas);
+
         const ctx = canvas.getContext('2d');
         if (!ctx) {
             return;
@@ -2892,6 +3012,9 @@
         if (otherMonth) cell.classList.add('other-month');
         if (isToday) cell.classList.add('today');
 
+        // Store ISO date on cell for event delegation
+        cell.setAttribute('data-date', date.toISOString().split('T')[0]);
+
         const dayNumber = document.createElement('div');
         dayNumber.className = 'day-number';
         dayNumber.textContent = day;
@@ -2930,15 +3053,7 @@
             getContent: () => getDayTooltipContent(date)
         });
 
-        cell.addEventListener('click', () => {
-            hideDayContextMenu();
-            showDayModal(date, day);
-        });
-
-        cell.addEventListener('contextmenu', event => {
-            event.preventDefault();
-            showDayContextMenu(event.clientX, event.clientY, date);
-        });
+        // Event listeners removed - now handled by event delegation on calendarGrid
 
         return cell;
     }
@@ -3146,6 +3261,158 @@
         anchor.click();
         document.body.removeChild(anchor);
         URL.revokeObjectURL(url);
+    }
+
+    // Safe import with validation, sanitization, and de-duplication
+    function importData(jsonString) {
+        if (!jsonString || typeof jsonString !== 'string') {
+            throw new Error('Invalid input: Expected a JSON string');
+        }
+
+        let parsed;
+        try {
+            parsed = JSON.parse(jsonString);
+        } catch (e) {
+            throw new Error(`Invalid JSON: ${e.message}`);
+        }
+
+        // Require transactions array
+        if (!parsed || typeof parsed !== 'object') {
+            throw new Error('Invalid data: Expected an object');
+        }
+
+        if (!Array.isArray(parsed.transactions)) {
+            throw new Error('Invalid data: Missing or invalid transactions array');
+        }
+
+        // Sanitize string to prevent XSS
+        function sanitizeString(str) {
+            if (typeof str !== 'string') return '';
+            return str
+                .replace(/[<>]/g, '') // Remove angle brackets
+                .replace(/javascript:/gi, '') // Remove javascript: protocol
+                .replace(/on\w+=/gi, '') // Remove event handlers
+                .slice(0, 500); // Limit length
+        }
+
+        // Validate and transform transactions
+        const validTransactions = [];
+        const seenKeys = new Set();
+
+        for (let i = 0; i < parsed.transactions.length; i++) {
+            const txn = parsed.transactions[i];
+
+            if (!txn || typeof txn !== 'object') {
+                console.warn(`Skipping invalid transaction at index ${i}: not an object`);
+                continue;
+            }
+
+            // Validate type
+            const validTypes = ['paycheck', 'income', 'expense'];
+            let type = String(txn.type || '').toLowerCase();
+            if (type === 'income') type = 'paycheck'; // Normalize legacy type
+            if (!validTypes.includes(type)) {
+                console.warn(`Skipping transaction at index ${i}: invalid type "${txn.type}"`);
+                continue;
+            }
+
+            // Validate amount (must be positive numeric)
+            const amount = Number.parseFloat(txn.amount);
+            if (!Number.isFinite(amount) || amount < 0) {
+                console.warn(`Skipping transaction at index ${i}: invalid amount "${txn.amount}"`);
+                continue;
+            }
+
+            // Round amount to cents
+            const roundedAmount = Math.round(amount * 100) / 100;
+
+            // Validate and parse date
+            const dateValue = ensureDate(txn.date);
+            if (!dateValue) {
+                console.warn(`Skipping transaction at index ${i}: invalid date "${txn.date}"`);
+                continue;
+            }
+
+            // Sanitize description
+            const description = sanitizeString(txn.description || '');
+
+            // Validate frequency
+            const validFrequencies = ['once', 'daily', 'weekly', 'biweekly', 'monthly'];
+            const frequency = validFrequencies.includes(txn.frequency) ? txn.frequency : 'once';
+
+            // Normalize category label
+            const category = normalizeTagLabel(txn.category || '');
+
+            // Create stable key for de-duplication (if id provided, use it; otherwise use combination of fields)
+            const stableKey = txn.id
+                ? `id:${txn.id}`
+                : `${type}:${roundedAmount}:${dateValue.toISOString()}:${description}:${frequency}:${category}`;
+
+            // De-duplicate
+            if (seenKeys.has(stableKey)) {
+                console.warn(`Skipping duplicate transaction at index ${i}`);
+                continue;
+            }
+            seenKeys.add(stableKey);
+
+            // Add valid transaction
+            validTransactions.push({
+                type,
+                amount: roundedAmount,
+                description,
+                date: dateValue,
+                frequency,
+                category
+            });
+        }
+
+        if (validTransactions.length === 0) {
+            throw new Error('No valid transactions found in import data');
+        }
+
+        // Import the validated transactions
+        state.transactions = [...state.transactions, ...validTransactions];
+        state.transactions.sort((a, b) => (a.date?.getTime() || 0) - (b.date?.getTime() || 0));
+
+        // Ensure all categories exist
+        ensureTransactionCategories();
+
+        // Optionally import starting balance if provided
+        if (typeof parsed.startingBalance === 'number' && Number.isFinite(parsed.startingBalance)) {
+            state.startingBalance = parsed.startingBalance;
+        }
+
+        if (parsed.balanceEffectiveDate) {
+            const effectiveDate = ensureDate(parsed.balanceEffectiveDate);
+            if (effectiveDate) {
+                state.startingBalanceDate = effectiveDate;
+            }
+        }
+
+        // Optionally import categories if provided
+        if (parsed.categories && typeof parsed.categories === 'object') {
+            const importedCategories = ensureCategoriesStructure(parsed.categories);
+            // Merge with existing categories
+            ['expense', 'income'].forEach(group => {
+                if (Array.isArray(importedCategories[group])) {
+                    importedCategories[group].forEach(cat => {
+                        const normalized = normalizeTagLabel(cat);
+                        if (normalized && !state.categories[group].some(c => c.toLowerCase() === normalized.toLowerCase())) {
+                            state.categories[group].push(normalized);
+                        }
+                    });
+                }
+            });
+            ['expense', 'income'].forEach(sortCategoriesInGroup);
+        }
+
+        invalidateCaches();
+        persistState();
+
+        return {
+            imported: validTransactions.length,
+            skipped: parsed.transactions.length - validTransactions.length
+        };
     }
 
     function clearAllData() {
@@ -3372,6 +3639,30 @@
         elements.nav.today?.addEventListener('click', () => {
             state.currentDate = new Date();
             renderCalendar();
+        });
+
+        // Calendar grid event delegation - single listener for all day cells
+        elements.calendarGrid?.addEventListener('click', event => {
+            const target = event.target instanceof Element ? event.target : null;
+            const cell = target?.closest('.day-cell');
+            if (cell && cell.hasAttribute('data-date')) {
+                const isoDate = cell.getAttribute('data-date');
+                const date = new Date(`${isoDate}T00:00:00`);
+                const day = date.getDate();
+                hideDayContextMenu();
+                showDayModal(date, day);
+            }
+        });
+
+        elements.calendarGrid?.addEventListener('contextmenu', event => {
+            event.preventDefault();
+            const target = event.target instanceof Element ? event.target : null;
+            const cell = target?.closest('.day-cell');
+            if (cell && cell.hasAttribute('data-date')) {
+                const isoDate = cell.getAttribute('data-date');
+                const date = new Date(`${isoDate}T00:00:00`);
+                showDayContextMenu(event.clientX, event.clientY, date);
+            }
         });
 
         elements.addButtons.paycheck?.addEventListener('click', () => openTransactionModal('paycheck'));

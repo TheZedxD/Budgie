@@ -9,9 +9,9 @@
 </head>
 <body>
     <div class="overlay" id="overlay"></div>
-    <div class="settings-modal" id="settingsModal">
+    <div class="settings-modal" id="settingsModal" role="dialog" aria-modal="true" aria-labelledby="settingsModalTitle">
         <div class="modal-header">
-            <h2>Settings</h2>
+            <h2 id="settingsModalTitle">Settings</h2>
             <button class="modal-close" id="settingsModalClose" aria-label="Close">×</button>
         </div>
         <div class="modal-body">
@@ -35,7 +35,7 @@
         </div>
     </div>
     
-    <div class="transaction-modal" id="transactionModal">
+    <div class="transaction-modal" id="transactionModal" role="dialog" aria-modal="true" aria-labelledby="transactionModalTitle">
         <div class="modal-header">
             <h2 id="transactionModalTitle">Add Paycheck</h2>
             <button class="modal-close" id="transactionModalClose" aria-label="Close">×</button>
@@ -112,7 +112,7 @@
                     <p>Based on current recurring transactions and balances.</p>
                     <button type="button" class="btn-tertiary report-range-btn" id="openHistoricalReports" data-tooltip="View historical range">Custom Range</button>
                 </header>
-                <canvas id="reportsLineChart" width="960" height="360"></canvas>
+                <canvas id="reportsLineChart" class="responsive-canvas"></canvas>
                 <div class="report-legend" id="reportsLineLegend"></div>
                 <div class="report-empty" id="reportsLineEmpty">Add a starting balance or transactions to view projections.</div>
             </section>
@@ -121,7 +121,7 @@
                     <h3>Current Month Expenses</h3>
                     <p>Breakdown of expenses this month.</p>
                 </header>
-                <canvas id="reportsPieChart" width="440" height="420"></canvas>
+                <canvas id="reportsPieChart" class="responsive-canvas"></canvas>
                 <div class="report-legend" id="reportsPieLegend"></div>
                 <div class="report-empty" id="reportsPieEmpty">No expenses recorded for this month.</div>
             </section>
@@ -179,7 +179,7 @@
         </div>
     </div>
 
-    <div class="day-modal" id="dayModal">
+    <div class="day-modal" id="dayModal" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
         <div class="modal-header">
             <h2 id="modalTitle">Day Details</h2>
             <button class="modal-close" id="modalClose" aria-label="Close">×</button>
@@ -209,9 +209,9 @@
             </div>
         </div>
     </div>
-    <div class="transactions-modal" id="transactionsModal">
+    <div class="transactions-modal" id="transactionsModal" role="dialog" aria-modal="true" aria-labelledby="transactionsModalTitle">
         <div class="modal-header">
-            <h2>Monthly Transactions</h2>
+            <h2 id="transactionsModalTitle">Monthly Transactions</h2>
             <button class="modal-close" id="transactionsModalClose" aria-label="Close">×</button>
         </div>
         <div class="modal-body">
@@ -365,7 +365,7 @@
                         <h3>Daily Balance Trend</h3>
                         <p>Actual end-of-day balances for the selected period.</p>
                     </header>
-                    <canvas id="historicalLineChart" width="840" height="320"></canvas>
+                    <canvas id="historicalLineChart" class="responsive-canvas"></canvas>
                     <div class="report-empty" id="historicalLineEmpty">Select a date range with recorded activity.</div>
                 </div>
                 <div class="historical-chart">
@@ -373,7 +373,7 @@
                         <h3>Expenses by Category</h3>
                         <p>Distribution of spending within the range.</p>
                     </header>
-                    <canvas id="historicalPieChart" width="480" height="360"></canvas>
+                    <canvas id="historicalPieChart" class="responsive-canvas"></canvas>
                     <div class="report-legend" id="historicalPieLegend"></div>
                     <div class="report-empty" id="historicalPieEmpty">No expenses in this range.</div>
                 </div>
