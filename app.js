@@ -43,6 +43,13 @@
         categories: {
             expense: [],
             income: []
+        },
+        filter: {
+            searchTerm: '',
+            category: '',
+            type: '',
+            startDate: null,
+            endDate: null
         }
     };
 
@@ -197,6 +204,264 @@
         balanceByDate: new Map(),
         balanceComputedUntil: null
     };
+
+    // Undo/redo history management
+    const history = {
+        past: [],
+        future: [],
+        maxSize: 50
+    };
+
+    function saveStateSnapshot() {
+        // Create a snapshot of current state
+        const snapshot = {
+            transactions: JSON.parse(JSON.stringify(state.transactions.map(t => ({
+                type: t.type,
+                amount: t.amount,
+                description: t.description,
+                date: t.date?.toISOString(),
+                frequency: t.frequency,
+                category: t.category
+            })))),
+            startingBalance: state.startingBalance,
+            startingBalanceDate: state.startingBalanceDate?.toISOString() || null
+        };
+
+        // Add to past history
+        history.past.push(snapshot);
+
+        // Limit history size
+        if (history.past.length > history.maxSize) {
+            history.past.shift();
+        }
+
+        // Clear future when new action is taken
+        history.future = [];
+    }
+
+    function undo() {
+        if (history.past.length === 0) {
+            return false;
+        }
+
+        // Save current state to future
+        const currentSnapshot = {
+            transactions: JSON.parse(JSON.stringify(state.transactions.map(t => ({
+                type: t.type,
+                amount: t.amount,
+                description: t.description,
+                date: t.date?.toISOString(),
+                frequency: t.frequency,
+                category: t.category
+            })))),
+            startingBalance: state.startingBalance,
+            startingBalanceDate: state.startingBalanceDate?.toISOString() || null
+        };
+        history.future.push(currentSnapshot);
+
+        // Restore previous state
+        const previousSnapshot = history.past.pop();
+        restoreSnapshot(previousSnapshot);
+
+        return true;
+    }
+
+    function redo() {
+        if (history.future.length === 0) {
+            return false;
+        }
+
+        // Save current state to past
+        const currentSnapshot = {
+            transactions: JSON.parse(JSON.stringify(state.transactions.map(t => ({
+                type: t.type,
+                amount: t.amount,
+                description: t.description,
+                date: t.date?.toISOString(),
+                frequency: t.frequency,
+                category: t.category
+            })))),
+            startingBalance: state.startingBalance,
+            startingBalanceDate: state.startingBalanceDate?.toISOString() || null
+        };
+        history.past.push(currentSnapshot);
+
+        // Restore next state
+        const nextSnapshot = history.future.pop();
+        restoreSnapshot(nextSnapshot);
+
+        return true;
+    }
+
+    function restoreSnapshot(snapshot) {
+        // Restore transactions
+        state.transactions = snapshot.transactions.map(t => ({
+            type: t.type,
+            amount: t.amount,
+            description: t.description,
+            date: new Date(t.date),
+            frequency: t.frequency,
+            category: t.category
+        }));
+
+        // Restore balance
+        state.startingBalance = snapshot.startingBalance;
+        state.startingBalanceDate = snapshot.startingBalanceDate ? new Date(snapshot.startingBalanceDate) : null;
+
+        // Invalidate caches and re-render
+        invalidateCaches();
+        renderCalendar();
+        updateSummary();
+        persistState();
+    }
+
+    // Debounce utility for performance optimization
+    function debounce(fn, wait) {
+        let timeoutId = null;
+        return function(...args) {
+            if (timeoutId !== null) {
+                clearTimeout(timeoutId);
+            }
+            timeoutId = setTimeout(() => {
+                fn.apply(this, args);
+            }, wait);
+        };
+    }
+
+    // Loading state management
+    const loadingState = {
+        element: null,
+        count: 0
+    };
+
+    function showLoading(msg = 'Loading...') {
+        loadingState.count++;
+
+        if (!loadingState.element) {
+            const loader = document.createElement('div');
+            loader.className = 'app-loader';
+            loader.innerHTML = `
+                <div class="loader-spinner"></div>
+                <div class="loader-message">${escapeHtml(msg)}</div>
+            `;
+            document.body.appendChild(loader);
+            loadingState.element = loader;
+        }
+
+        // Update message if provided
+        const messageEl = loadingState.element.querySelector('.loader-message');
+        if (messageEl) {
+            messageEl.textContent = msg;
+        }
+
+        loadingState.element.classList.add('visible');
+    }
+
+    function hideLoading() {
+        loadingState.count = Math.max(0, loadingState.count - 1);
+
+        if (loadingState.count === 0 && loadingState.element) {
+            loadingState.element.classList.remove('visible');
+        }
+    }
+
+    // Transaction filtering
+    function filterTransactions(searchTerm = '', options = {}) {
+        const { category = '', type = '', startDate = null, endDate = null } = options;
+
+        return state.transactions.filter(transaction => {
+            // Search term match (fuzzy text match on description and amount)
+            if (searchTerm) {
+                const term = searchTerm.toLowerCase();
+                const descMatch = (transaction.description || '').toLowerCase().includes(term);
+                const amountMatch = transaction.amount.toString().includes(term);
+                const categoryMatch = (transaction.category || '').toLowerCase().includes(term);
+
+                if (!descMatch && !amountMatch && !categoryMatch) {
+                    return false;
+                }
+            }
+
+            // Category filter
+            if (category && transaction.category !== category) {
+                return false;
+            }
+
+            // Type filter
+            if (type) {
+                if (type === 'income' && !isIncomeType(transaction.type)) {
+                    return false;
+                }
+                if (type === 'expense' && isIncomeType(transaction.type)) {
+                    return false;
+                }
+            }
+
+            // Date range filter
+            if (startDate || endDate) {
+                const transactionDate = ensureDate(transaction.date);
+                if (!transactionDate) {
+                    return false;
+                }
+
+                if (startDate) {
+                    const start = ensureDate(startDate);
+                    if (start && transactionDate < start) {
+                        return false;
+                    }
+                }
+
+                if (endDate) {
+                    const end = ensureDate(endDate);
+                    if (end && transactionDate > end) {
+                        return false;
+                    }
+                }
+            }
+
+            return true;
+        });
+    }
+
+    function applyFilter(searchTerm = '', options = {}) {
+        state.filter.searchTerm = searchTerm;
+        state.filter.category = options.category || '';
+        state.filter.type = options.type || '';
+        state.filter.startDate = options.startDate || null;
+        state.filter.endDate = options.endDate || null;
+
+        // Invalidate caches and re-render
+        invalidateCaches();
+        renderCalendar();
+        updateSummary();
+    }
+
+    function clearFilter() {
+        state.filter.searchTerm = '';
+        state.filter.category = '';
+        state.filter.type = '';
+        state.filter.startDate = null;
+        state.filter.endDate = null;
+
+        // Invalidate caches and re-render
+        invalidateCaches();
+        renderCalendar();
+        updateSummary();
+    }
+
+    function getFilteredTransactions() {
+        if (!state.filter.searchTerm && !state.filter.category &&
+            !state.filter.type && !state.filter.startDate && !state.filter.endDate) {
+            return state.transactions;
+        }
+
+        return filterTransactions(state.filter.searchTerm, {
+            category: state.filter.category,
+            type: state.filter.type,
+            startDate: state.filter.startDate,
+            endDate: state.filter.endDate
+        });
+    }
 
     const reportsState = {
         interactivityInitialized: false,
@@ -1204,6 +1469,7 @@
     }
 
     function persistState() {
+        const opId = Date.now();
         try {
             const serialized = JSON.stringify(state.transactions.map(item => ({
                 type: item.type,
@@ -1222,7 +1488,21 @@
             }
             persistCategories();
         } catch (error) {
-            console.error('Error saving data:', error);
+            if (error.name === 'QuotaExceededError' || error.code === 22) {
+                // Storage quota exceeded - show actionable alert
+                const message = 'Storage limit exceeded! Your browser has run out of space to save data.\n\n' +
+                               'To fix this:\n' +
+                               '1. Export your data (Settings → Export Data)\n' +
+                               '2. Clear old transactions you no longer need\n' +
+                               '3. Clear browser data for other sites\n' +
+                               '4. Try using a different browser';
+                alert(message);
+                console.error(`[OpID ${opId}] QuotaExceededError:`, error);
+            } else {
+                // Unexpected error
+                console.error(`[OpID ${opId}] Unexpected error saving data:`, error);
+                alert('An unexpected error occurred while saving your data. Please check the console for details.');
+            }
         }
     }
 
@@ -1883,9 +2163,14 @@
     }
 
     function renderReports() {
-        renderReportsLineChart();
-        renderReportsPieChart();
-        initializeReportsInteractivity();
+        try {
+            showLoading('Generating reports...');
+            renderReportsLineChart();
+            renderReportsPieChart();
+            initializeReportsInteractivity();
+        } finally {
+            hideLoading();
+        }
     }
 
     function getDateRangeDailySummaries(startDate, endDate) {
@@ -2234,34 +2519,40 @@
         if (!start || !end || end < start) {
             return;
         }
-        hideHistoricalReportsTooltip();
-        historicalReportsState.line.range = { start, end };
-        const summaries = getDateRangeDailySummaries(start, end);
-        historicalReportsState.line.data = summaries;
-        historicalReportsState.line.hoverIndex = null;
 
-        const expenseBreakdown = getDateRangeExpenseBreakdown(start, end);
-        historicalReportsState.pie.slicesData = expenseBreakdown;
-        historicalReportsState.pie.hoverIndex = null;
+        try {
+            showLoading('Generating historical reports...');
+            hideHistoricalReportsTooltip();
+            historicalReportsState.line.range = { start, end };
+            const summaries = getDateRangeDailySummaries(start, end);
+            historicalReportsState.line.data = summaries;
+            historicalReportsState.line.hoverIndex = null;
 
-        const totalIncome = summaries.reduce((sum, day) => sum + day.income, 0);
-        const totalExpenses = summaries.reduce((sum, day) => sum + day.expenses, 0);
-        const net = totalIncome - totalExpenses;
-        const modal = elements.modals.historicalReports;
-        if (modal.incomeTotal) {
-            modal.incomeTotal.textContent = formatCurrency(totalIncome);
-        }
-        if (modal.expenseTotal) {
-            modal.expenseTotal.textContent = formatCurrency(totalExpenses);
-        }
-        if (modal.netTotal) {
-            modal.netTotal.textContent = formatCurrency(net);
-            modal.netTotal.classList.remove('positive', 'negative');
-            modal.netTotal.classList.add(net >= 0 ? 'positive' : 'negative');
-        }
+            const expenseBreakdown = getDateRangeExpenseBreakdown(start, end);
+            historicalReportsState.pie.slicesData = expenseBreakdown;
+            historicalReportsState.pie.hoverIndex = null;
 
-        renderHistoricalLineChart();
-        renderHistoricalPieChart();
+            const totalIncome = summaries.reduce((sum, day) => sum + day.income, 0);
+            const totalExpenses = summaries.reduce((sum, day) => sum + day.expenses, 0);
+            const net = totalIncome - totalExpenses;
+            const modal = elements.modals.historicalReports;
+            if (modal.incomeTotal) {
+                modal.incomeTotal.textContent = formatCurrency(totalIncome);
+            }
+            if (modal.expenseTotal) {
+                modal.expenseTotal.textContent = formatCurrency(totalExpenses);
+            }
+            if (modal.netTotal) {
+                modal.netTotal.textContent = formatCurrency(net);
+                modal.netTotal.classList.remove('positive', 'negative');
+                modal.netTotal.classList.add(net >= 0 ? 'positive' : 'negative');
+            }
+
+            renderHistoricalLineChart();
+            renderHistoricalPieChart();
+        } finally {
+            hideLoading();
+        }
     }
 
     function initializeHistoricalReportsInteractivity() {
@@ -3690,14 +3981,33 @@
         });
         document.addEventListener('scroll', hideDayContextMenu, true);
         window.addEventListener('resize', hideDayContextMenu);
-        window.addEventListener('resize', () => {
+        window.addEventListener('resize', debounce(() => {
             window.requestAnimationFrame(() => {
                 maybeRenderReports();
                 maybeRenderHistoricalReports();
             });
-        });
+        }, 150));
 
         document.addEventListener('keydown', event => {
+            // Undo/Redo shortcuts
+            if ((event.ctrlKey || event.metaKey) && !event.altKey) {
+                if (event.shiftKey && event.key.toLowerCase() === 'z') {
+                    // Ctrl/Cmd+Shift+Z = Redo
+                    event.preventDefault();
+                    if (redo()) {
+                        console.log('Redo applied');
+                    }
+                    return;
+                } else if (!event.shiftKey && event.key.toLowerCase() === 'z') {
+                    // Ctrl/Cmd+Z = Undo
+                    event.preventDefault();
+                    if (undo()) {
+                        console.log('Undo applied');
+                    }
+                    return;
+                }
+            }
+
             if (event.key === 'Escape') {
                 tooltipManager.hide();
                 hideHistoricalReportsTooltip();
