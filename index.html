@@ -1,0 +1,397 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Budgie</title>
+    <link rel="stylesheet" href="styles.css">
+
+</head>
+<body>
+    <div class="overlay" id="overlay"></div>
+    <div class="settings-modal" id="settingsModal">
+        <div class="modal-header">
+            <h2>Settings</h2>
+            <button class="modal-close" id="settingsModalClose" aria-label="Close">×</button>
+        </div>
+        <div class="modal-body">
+            <p class="settings-description">
+                Set the starting balance used for projections and daily totals. You can update this anytime.
+            </p>
+            <form id="settingsForm">
+                <div class="form-group">
+                    <label for="startingBalanceInput">Starting Balance ($)</label>
+                    <input type="number" id="startingBalanceInput" step="0.01" required placeholder="0.00">
+                </div>
+                <div class="form-group">
+                    <label for="startingBalanceDateInput">Effective Date</label>
+                    <input type="date" id="startingBalanceDateInput">
+                </div>
+                <div class="settings-actions">
+                    <button type="button" class="btn btn-secondary" id="cancelSettings">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Save Settings</button>
+                </div>
+            </form>
+        </div>
+    </div>
+    
+    <div class="transaction-modal" id="transactionModal">
+        <div class="modal-header">
+            <h2 id="transactionModalTitle">Add Paycheck</h2>
+            <button class="modal-close" id="transactionModalClose" aria-label="Close">×</button>
+        </div>
+        <div class="modal-body">
+            <form id="transactionForm">
+                <input type="hidden" id="transactionType" value="paycheck">
+                
+                <div class="form-group">
+                    <label for="transactionAmount">Amount ($)</label>
+                    <input type="number" id="transactionAmount" step="0.01" min="0" required placeholder="0.00">
+                </div>
+
+                <div class="form-group">
+                    <label id="transactionCategoryLabel">Category</label>
+                    <input type="hidden" id="transactionCategory">
+                    <div id="transactionCategoryChips" class="category-chip-group" role="radiogroup" aria-labelledby="transactionCategoryLabel"></div>
+                </div>
+
+                <div class="form-group">
+                    <label for="transactionDescription">Notes</label>
+                    <input type="text" id="transactionDescription" placeholder="Optional personal notes">
+                </div>
+
+                <div class="form-group">
+                    <label for="transactionDate">Date</label>
+                    <input type="date" id="transactionDate" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="transactionFrequency">Frequency</label>
+                    <select id="transactionFrequency" required>
+                        <option value="once">One-time</option>
+                        <option value="daily">Daily</option>
+                        <option value="weekly">Weekly</option>
+                        <option value="biweekly">Bi-weekly</option>
+                        <option value="monthly">Monthly</option>
+                    </select>
+                </div>
+
+                <div class="form-actions">
+                    <button type="button" class="btn btn-secondary" id="cancelTransaction">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Save Transaction</button>
+                </div>
+            </form>
+        </div>
+    </div>
+    
+    <div class="confirm-modal" id="confirmClearModal" role="dialog" aria-modal="true" aria-labelledby="confirmClearTitle">
+        <div class="modal-header">
+            <h2 id="confirmClearTitle">Clear All Data?</h2>
+            <button class="modal-close" id="confirmClearClose" aria-label="Close">×</button>
+        </div>
+        <div class="modal-body">
+            <p class="confirm-description">
+                This will remove every saved transaction, reset your starting balance, and clear all preferences. This action cannot be undone.
+            </p>
+            <div class="confirm-actions">
+                <button type="button" class="btn btn-secondary" id="cancelClearData">No, Keep Data</button>
+                <button type="button" class="btn btn-danger" id="confirmClearData">Yes, Clear Everything</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="reports-modal" id="reportsModal" role="dialog" aria-modal="true" aria-labelledby="reportsModalTitle">
+        <div class="modal-header">
+            <h2 id="reportsModalTitle">Reports</h2>
+            <button class="modal-close" id="reportsModalClose" aria-label="Close">×</button>
+        </div>
+        <div class="modal-body">
+            <section class="report-section">
+                <header class="report-header">
+                    <h3>Projected Balance (24 Months)</h3>
+                    <p>Based on current recurring transactions and balances.</p>
+                    <button type="button" class="btn-tertiary report-range-btn" id="openHistoricalReports" data-tooltip="View historical range">Custom Range</button>
+                </header>
+                <canvas id="reportsLineChart" width="960" height="360"></canvas>
+                <div class="report-legend" id="reportsLineLegend"></div>
+                <div class="report-empty" id="reportsLineEmpty">Add a starting balance or transactions to view projections.</div>
+            </section>
+            <section class="report-section">
+                <header class="report-header">
+                    <h3>Current Month Expenses</h3>
+                    <p>Breakdown of expenses this month.</p>
+                </header>
+                <canvas id="reportsPieChart" width="440" height="420"></canvas>
+                <div class="report-legend" id="reportsPieLegend"></div>
+                <div class="report-empty" id="reportsPieEmpty">No expenses recorded for this month.</div>
+            </section>
+            <div class="report-tooltip" id="reportsTooltip" role="status" aria-live="polite"></div>
+        </div>
+    </div>
+
+    <div class="categories-modal" id="categoriesModal" role="dialog" aria-modal="true" aria-labelledby="categoriesModalTitle">
+        <div class="modal-header">
+            <h2 id="categoriesModalTitle">Manage Tags &amp; Categories</h2>
+            <button class="modal-close" id="categoriesModalClose" aria-label="Close">×</button>
+        </div>
+        <div class="modal-body">
+            <div class="categories-columns">
+                <section class="category-pane">
+                    <header class="category-header">
+                        <h3>Expense Tags</h3>
+                        <p>Organize your spending categories.</p>
+                    </header>
+                    <div class="tag-editor">
+                        <div class="tag-list" id="expenseTagsList"></div>
+                        <label class="tag-select-label" for="expenseTagSelect">Current expense tags</label>
+                        <select id="expenseTagSelect" class="tag-select" size="6" aria-label="Expense tags"></select>
+                        <form class="tag-form" id="expenseTagForm">
+                            <label class="tag-form-label" for="expenseTagInput">Add a new expense tag</label>
+                            <div class="tag-form-row">
+                                <input type="text" id="expenseTagInput" placeholder="e.g., Groceries" maxlength="32" required>
+                                <button type="submit" class="btn btn-primary">Add</button>
+                            </div>
+                        </form>
+                    </div>
+                </section>
+                <section class="category-pane">
+                    <header class="category-header">
+                        <h3>Income Tags</h3>
+                        <p>Label your paychecks and income sources.</p>
+                    </header>
+                    <div class="tag-editor">
+                        <div class="tag-list" id="incomeTagsList"></div>
+                        <label class="tag-select-label" for="incomeTagSelect">Current income tags</label>
+                        <select id="incomeTagSelect" class="tag-select" size="6" aria-label="Income tags"></select>
+                        <form class="tag-form" id="incomeTagForm">
+                            <label class="tag-form-label" for="incomeTagInput">Add a new income tag</label>
+                            <div class="tag-form-row">
+                                <input type="text" id="incomeTagInput" placeholder="e.g., Freelance" maxlength="32" required>
+                                <button type="submit" class="btn btn-primary">Add</button>
+                            </div>
+                        </form>
+                    </div>
+                </section>
+            </div>
+            <div class="categories-footer">
+                <p class="categories-hint">Tip: Customize tags to group transactions and fine-tune your reports.</p>
+            </div>
+        </div>
+    </div>
+
+    <div class="day-modal" id="dayModal">
+        <div class="modal-header">
+            <h2 id="modalTitle">Day Details</h2>
+            <button class="modal-close" id="modalClose" aria-label="Close">×</button>
+        </div>
+        <div class="modal-body">
+            <div class="balance-summary">
+                <div class="balance-row">
+                    <span>Starting Balance:</span>
+                    <span id="modalStartBalance">$0.00</span>
+                </div>
+                <div class="balance-row">
+                    <span>Paychecks Today:</span>
+                    <span class="text-income" id="modalIncome">$0.00</span>
+                </div>
+                <div class="balance-row">
+                    <span>Expenses Today:</span>
+                    <span class="text-expense" id="modalExpenses">$0.00</span>
+                </div>
+                <div class="balance-row total">
+                    <span>Ending Balance:</span>
+                    <span id="modalEndBalance">$0.00</span>
+                </div>
+            </div>
+            <h3>Transactions</h3>
+            <div class="transaction-list" id="modalTransactions">
+                <!-- Transactions will be listed here -->
+            </div>
+        </div>
+    </div>
+    <div class="transactions-modal" id="transactionsModal">
+        <div class="modal-header">
+            <h2>Monthly Transactions</h2>
+            <button class="modal-close" id="transactionsModalClose" aria-label="Close">×</button>
+        </div>
+        <div class="modal-body">
+            <div class="transactions-month-header">
+                <div class="transactions-month-title" id="transactionsMonthLabel"></div>
+                <div class="transactions-month-stats">
+                    <span class="stat income">Income: <span id="transactionsMonthIncome">$0.00</span></span>
+                    <span class="stat expense">Expenses: <span id="transactionsMonthExpenses">$0.00</span></span>
+                    <span class="stat net">Net: <span id="transactionsMonthNet">$0.00</span></span>
+                </div>
+            </div>
+            <div class="transactions-list" id="transactionsList"></div>
+            <div class="transactions-empty" id="transactionsEmptyMessage">No transactions for this month yet.</div>
+        </div>
+    </div>
+
+    <div class="header">
+        <div class="header-left">
+            <button class="hamburger" id="hamburger" type="button" aria-label="Toggle menu" aria-controls="sidePanel" aria-expanded="false">
+                <span></span>
+                <span></span>
+                <span></span>
+            </button>
+            <h1 class="app-title">
+                Budgie
+                <span class="brand-icon" aria-hidden="true">🐦</span>
+            </h1>
+        </div>
+        <div class="header-right">
+            <button class="theme-toggle-btn" id="themeToggle" type="button" aria-label="Switch to dark mode" aria-pressed="false">
+                <span class="icon-moon" aria-hidden="true">&#127769;</span>
+                <span class="icon-sun" aria-hidden="true">&#9728;</span>
+            </button>
+            <button class="settings-btn" id="openSettings" type="button">Settings</button>
+            <button class="panel-arrow collapsed" id="panelArrow" type="button" aria-controls="rightPanel" aria-expanded="false" aria-label="Toggle weekly projections" data-tooltip="Toggle weekly projections">
+                <svg width="20" height="20" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+                    <path d="M12 4L6 10L12 16" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+            </button>
+        </div>
+    </div>
+
+    <div class="side-panel" id="sidePanel">
+        <h2>Budgie Menu</h2>
+        <div class="panel-section">
+            <h3>Current Balance</h3>
+            <div class="total-balance" id="totalBalance">$0.00</div>
+        </div>
+        <div class="panel-section">
+            <h3>This Month</h3>
+            <div class="stat-line">Paychecks: <span id="monthIncome">$0.00</span></div>
+            <div class="stat-line">Expenses: <span id="monthExpenses">$0.00</span></div>
+            <div class="stat-line">Net: <span id="monthNet">$0.00</span></div>
+        </div>
+        <div class="panel-section">
+            <h3>Add Transaction</h3>
+            <button class="add-btn" id="addPaycheckBtn" type="button">+ Add Paycheck</button>
+            <button class="add-btn" id="addExpenseBtn" type="button">+ Add Expense</button>
+        </div>
+        <div class="panel-section">
+            <h3>Options</h3>
+            <button type="button" class="panel-link" id="viewTransactionsBtn">View All Transactions</button>
+            <button type="button" class="panel-link" id="openCategories">Categories</button>
+            <button type="button" class="panel-link" id="openReports">Reports</button>
+        </div>
+        <div class="panel-section">
+            <h3>Data Tools</h3>
+            <button class="add-btn export-btn" id="exportDataBtn" type="button">Export JSON</button>
+            <button class="add-btn danger-btn" id="clearDataBtn" type="button">Clear All Data</button>
+        </div>
+    </div>
+
+    <div class="main-content">
+        <div class="calendar-header">
+            <div class="calendar-nav">
+                <button class="nav-btn" id="prevMonth" type="button">← Previous</button>
+                <button class="nav-btn" id="today" type="button">Today</button>
+                <button class="nav-btn" id="nextMonth" type="button">Next →</button>
+            </div>
+            <div class="current-month" id="currentMonth"></div>
+        </div>
+        <div class="month-summary" id="monthSummary">
+            <div class="summary-item">
+                <span class="summary-label">Paychecks</span>
+                <span class="summary-value positive" id="summaryPaycheck">$0.00</span>
+            </div>
+            <div class="summary-item">
+                <span class="summary-label">Expenses</span>
+                <span class="summary-value negative" id="summaryExpenses">$0.00</span>
+            </div>
+            <div class="summary-item">
+                <span class="summary-label">Net</span>
+                <span class="summary-value" id="summaryNet">$0.00</span>
+            </div>
+        </div>
+
+        <div class="calendar">
+            <div class="calendar-grid" id="calendarGrid">
+                <!-- Calendar will be generated here -->
+            </div>
+        </div>
+    </div>
+
+    <div class="right-panel collapsed" id="rightPanel">
+        <h3>Weekly Projections</h3>
+        <div id="weeklyProjections">
+            <!-- Weekly projections will appear here -->
+        </div>
+    </div>
+
+    <div class="historical-reports-modal" id="historicalReportsModal" role="dialog" aria-modal="true" aria-labelledby="historicalReportsTitle">
+        <div class="modal-header">
+            <h2 id="historicalReportsTitle">Custom Range Report</h2>
+            <button class="modal-close" id="historicalReportsClose" aria-label="Close">×</button>
+        </div>
+        <div class="modal-body">
+            <form id="historicalReportsForm" class="historical-form">
+                <div class="historical-form-row">
+                    <div class="form-group">
+                        <label for="historicalStartDate">Start Date</label>
+                        <input type="date" id="historicalStartDate" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="historicalEndDate">End Date</label>
+                        <input type="date" id="historicalEndDate" required>
+                    </div>
+                    <div class="historical-form-actions">
+                        <button type="submit" class="btn btn-primary">Show Report</button>
+                    </div>
+                </div>
+                <p class="historical-note">Tip: Range must end on or before today to use actual balance history.</p>
+                <div class="historical-error" id="historicalReportsError" role="alert"></div>
+            </form>
+            <section class="historical-summary">
+                <div class="summary-card">
+                    <span class="summary-card-label">Total Income</span>
+                    <span class="summary-card-value positive" id="historicalIncomeTotal">$0.00</span>
+                </div>
+                <div class="summary-card">
+                    <span class="summary-card-label">Total Expenses</span>
+                    <span class="summary-card-value negative" id="historicalExpenseTotal">$0.00</span>
+                </div>
+                <div class="summary-card">
+                    <span class="summary-card-label">Net Change</span>
+                    <span class="summary-card-value" id="historicalNetTotal">$0.00</span>
+                </div>
+            </section>
+            <section class="historical-charts">
+                <div class="historical-chart">
+                    <header>
+                        <h3>Daily Balance Trend</h3>
+                        <p>Actual end-of-day balances for the selected period.</p>
+                    </header>
+                    <canvas id="historicalLineChart" width="840" height="320"></canvas>
+                    <div class="report-empty" id="historicalLineEmpty">Select a date range with recorded activity.</div>
+                </div>
+                <div class="historical-chart">
+                    <header>
+                        <h3>Expenses by Category</h3>
+                        <p>Distribution of spending within the range.</p>
+                    </header>
+                    <canvas id="historicalPieChart" width="480" height="360"></canvas>
+                    <div class="report-legend" id="historicalPieLegend"></div>
+                    <div class="report-empty" id="historicalPieEmpty">No expenses in this range.</div>
+                </div>
+            </section>
+            <div class="report-tooltip" id="historicalReportsTooltip" role="status" aria-live="polite"></div>
+        </div>
+    </div>
+
+    <div class="context-menu" id="dayContextMenu">
+        <button type="button" class="paycheck-option" data-type="paycheck">Add Paycheck</button>
+        <button type="button" class="expense-option" data-type="expense">Add Expense</button>
+    </div>
+
+    <button class="floating-expense-btn" id="quickExpenseBtn" type="button" aria-label="Add Expense" data-tooltip="Add Expense">
+        <span class="floating-expense-icon" aria-hidden="true">+</span>
+    </button>
+
+    <script src="app.js" defer></script>
+
+</body>
+</html>
