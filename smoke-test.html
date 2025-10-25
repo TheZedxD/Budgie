@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Budgie - Module Smoke Tests</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            max-width: 800px;
+            margin: 2rem auto;
+            padding: 0 1rem;
+            background: #f5f5f5;
+            color: #2c3e50;
+        }
+        h1 {
+            color: #f97316;
+        }
+        .info {
+            background: #fff;
+            padding: 1.5rem;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            margin-bottom: 1.5rem;
+        }
+        .console-output {
+            background: #1e1e1e;
+            color: #d4d4d4;
+            padding: 1rem;
+            border-radius: 8px;
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+            overflow-x: auto;
+            white-space: pre-wrap;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+        }
+        .status {
+            margin-top: 1rem;
+            padding: 1rem;
+            border-radius: 8px;
+            font-weight: 600;
+        }
+        .status.success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .status.error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+    </style>
+</head>
+<body>
+    <h1>🧪 Budgie Module Smoke Tests</h1>
+
+    <div class="info">
+        <p><strong>What this tests:</strong></p>
+        <ul>
+            <li>Each module can be imported in isolation</li>
+            <li>All expected functions and objects are exported</li>
+            <li>Basic functionality works correctly</li>
+        </ul>
+        <p>Open the browser console to see detailed results.</p>
+    </div>
+
+    <div id="output" class="console-output">Running tests...</div>
+    <div id="status"></div>
+
+    <script type="module">
+        // Intercept console.log to display in the page
+        const outputDiv = document.getElementById('output');
+        const statusDiv = document.getElementById('status');
+        const originalLog = console.log;
+        const originalError = console.error;
+
+        let logs = [];
+
+        console.log = function(...args) {
+            originalLog.apply(console, args);
+            logs.push(args.join(' '));
+            outputDiv.textContent = logs.join('\n');
+        };
+
+        console.error = function(...args) {
+            originalError.apply(console, args);
+            logs.push('ERROR: ' + args.join(' '));
+            outputDiv.textContent = logs.join('\n');
+        };
+
+        // Import and run the smoke test
+        try {
+            await import('./Scripts/smoke-test.js');
+            statusDiv.className = 'status success';
+            statusDiv.textContent = '✅ All smoke tests passed! The module structure is working correctly.';
+        } catch (error) {
+            statusDiv.className = 'status error';
+            statusDiv.textContent = '❌ Smoke tests failed. See console for details.';
+            console.error('Test execution error:', error);
+        }
+    </script>
+</body>
+</html>
