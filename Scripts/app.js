@@ -1800,6 +1800,7 @@ function registerEventListeners() {
         state.transactionsModalReturn = false;
         closeAllModals();
         hideDayContextMenu();
+        setOverlayVisibility();
     });
 
     elements.modals.day.close?.addEventListener('click', () => closeModal(elements.modals.day.root));
@@ -2061,6 +2062,7 @@ function registerEventListeners() {
             elements.hamburger?.setAttribute('aria-expanded', 'false');
             state.transactionsModalReturn = false;
             closeAllModals();
+            setOverlayVisibility();
         }
     });
 
