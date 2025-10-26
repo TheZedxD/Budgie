@@ -1021,12 +1021,56 @@ function handleModalTabTrap(event, modal) {
 
 ### Getting Started
 
-1. **Open the Application**
-   - Navigate to the Budgie directory
-   - Open `index.html` in a modern web browser
+**IMPORTANT:** Budgie uses ES6 modules, which require a local web server due to browser CORS security restrictions. You **cannot** open `index.html` directly in your browser (using `file://` protocol) as this will cause module loading errors.
+
+1. **Start a Local Web Server**
+
+   Choose one of these methods:
+
+   **Option A: Python (Recommended - Usually Pre-installed)**
+   ```bash
+   # Navigate to the Budgie directory
+   cd /path/to/Budgie
+
+   # Python 3 (most common)
+   python3 -m http.server 8000
+
+   # OR Python 2
+   python -m SimpleHTTPServer 8000
+   ```
+
+   **Option B: Node.js**
+   ```bash
+   # Install http-server globally (one time only)
+   npm install -g http-server
+
+   # Navigate to Budgie directory and run
+   cd /path/to/Budgie
+   http-server -p 8000
+   ```
+
+   **Option C: PHP**
+   ```bash
+   # Navigate to Budgie directory
+   cd /path/to/Budgie
+
+   # Start PHP built-in server
+   php -S localhost:8000
+   ```
+
+   **Option D: VS Code Live Server Extension**
+   - Install "Live Server" extension in VS Code
+   - Right-click `index.html` in VS Code
+   - Select "Open with Live Server"
+   - Server starts automatically
+
+2. **Open the Application**
+   - Open your web browser
+   - Navigate to: `http://localhost:8000`
+   - **DO NOT** use `file:///` URLs - they will not work
    - Recommended browsers: Chrome 90+, Firefox 88+, Safari 14+, Edge 90+
 
-2. **Set Starting Balance** (First Time)
+3. **Set Starting Balance** (First Time)
    - Click "Settings" button in header
    - Enter your current account balance
    - Select the effective date (usually today)

@@ -21,7 +21,66 @@ Budgie is a powerful, privacy-focused budgeting application that helps you track
 
 ## Quick Start
 
-1. Open `index.html` in a modern web browser
+**IMPORTANT:** Budgie uses ES6 modules, which require a local web server. You cannot open `index.html` directly in your browser (it will cause CORS errors).
+
+### Option 1: Python (Recommended)
+```bash
+# Navigate to the Budgie directory
+cd /path/to/Budgie
+
+# Python 3
+python3 -m http.server 8000
+
+# Python 2
+python -m SimpleHTTPServer 8000
+
+# Then open: http://localhost:8000
+```
+
+### Option 2: Node.js
+```bash
+# Install http-server globally (one time)
+npm install -g http-server
+
+# Run from Budgie directory
+http-server -p 8000
+
+# Then open: http://localhost:8000
+```
+
+### Option 3: PHP
+```bash
+# Navigate to the Budgie directory
+cd /path/to/Budgie
+
+# Start PHP server
+php -S localhost:8000
+
+# Then open: http://localhost:8000
+```
+
+### Option 4: VS Code Live Server
+1. Install "Live Server" extension in VS Code
+2. Right-click `index.html`
+3. Select "Open with Live Server"
+
+### Option 5: Startup Scripts (Easiest!)
+We've included helper scripts that automatically detect and start a server:
+
+**Linux/Mac:**
+```bash
+./START-SERVER.sh
+```
+
+**Windows:**
+```batch
+START-SERVER.bat
+```
+
+These scripts will automatically use Python, PHP, or Node.js (whichever is available).
+
+### Using the Application
+1. Access via `http://localhost:8000` (not `file://`)
 2. Click "Settings" to set your starting balance
 3. Add your first transaction using "+ Add Paycheck" or "+ Add Expense"
 4. View reports and projections to analyze your finances
@@ -38,6 +97,7 @@ Budgie is a powerful, privacy-focused budgeting application that helps you track
 
 - **`VERSION-1.0.md`** - Complete feature documentation, architecture details, and usage guide
 - **`Scripts/README.md`** - Module documentation and developer guide
+- **`TROUBLESHOOTING.md`** - Common issues and solutions (CORS errors, data issues, etc.)
 
 ## Project Structure
 
@@ -45,8 +105,11 @@ Budgie is a powerful, privacy-focused budgeting application that helps you track
 Budgie/
 ├── index.html              Main application entry point
 ├── styles.css              Complete application styling
+├── README.md               This file (quick start guide)
 ├── VERSION-1.0.md          Comprehensive Version 1.0 documentation
-├── README.md               This file
+├── TROUBLESHOOTING.md      Common issues and solutions
+├── START-SERVER.sh         Linux/Mac startup script
+├── START-SERVER.bat        Windows startup script
 └── Scripts/
     ├── app.js              Application bootstrap
     ├── state.js            State management
