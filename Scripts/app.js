@@ -473,14 +473,17 @@ function setOverlayVisibility() {
 
 function openModal(modal) {
     openModalModule(modal, tooltipManager, elements);
+    setOverlayVisibility();
 }
 
 function closeModal(modal) {
     closeModalModule(modal, elements);
+    setOverlayVisibility();
 }
 
 function closeAllModals() {
     closeAllModalsModule(allModals, elements);
+    setOverlayVisibility();
 }
 
 // Wrapper function for renderCalendar
