@@ -235,7 +235,18 @@ export function persistCategories() {
     try {
         localStorage.setItem(STORAGE_KEYS.categories, JSON.stringify(state.categories));
     } catch (error) {
-        console.error('Error saving categories:', error);
+        if (error.name === 'QuotaExceededError' || error.code === 22) {
+            const message = 'Storage limit exceeded! Your browser has run out of space to save categories.\n\n' +
+                           'To fix this:\n' +
+                           '1. Export your data (Settings → Export Data)\n' +
+                           '2. Clear old transactions you no longer need\n' +
+                           '3. Clear browser data for other sites\n' +
+                           '4. Try using a different browser';
+            alert(message);
+            console.error('QuotaExceededError saving categories:', error);
+        } else {
+            console.error('Error saving categories:', error);
+        }
     }
 }
 

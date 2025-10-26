@@ -98,6 +98,7 @@ These scripts will automatically use Python, PHP, or Node.js (whichever is avail
 - **`VERSION-1.0.md`** - Complete feature documentation, architecture details, and usage guide
 - **`Scripts/README.md`** - Module documentation and developer guide
 - **`TROUBLESHOOTING.md`** - Common issues and solutions (CORS errors, data issues, etc.)
+- **`CROSS-PLATFORM.md`** - Cross-platform compatibility guide for Windows, Linux, and macOS
 
 ## Project Structure
 
@@ -110,6 +111,8 @@ Budgie/
 ├── TROUBLESHOOTING.md      Common issues and solutions
 ├── START-SERVER.sh         Linux/Mac startup script
 ├── START-SERVER.bat        Windows startup script
+├── verify-fixes.sh         Linux/Mac verification script
+├── verify-fixes.bat        Windows verification script
 └── Scripts/
     ├── app.js              Application bootstrap
     ├── state.js            State management
@@ -129,6 +132,77 @@ Budgie/
 - Edge 90+ (April 2021)
 
 **Not supported:** Internet Explorer
+
+## Platform Compatibility
+
+Budgie is designed for **excellent cross-platform compatibility** between Windows, Linux (including CachyOS), and macOS.
+
+### Platform Support Matrix
+
+| Feature | Windows | Linux/CachyOS | macOS | Status |
+|---------|---------|---------------|-------|--------|
+| Application Code | ✓ | ✓ | ✓ | Identical |
+| Browser Support | ✓ | ✓ | ✓ | Identical |
+| localStorage | ✓ | ✓ | ✓ | Identical |
+| Data Import/Export | ✓ | ✓ | ✓ | Identical |
+| Keyboard Shortcuts | ✓ | ✓ | ✓ | Identical |
+| Theme Support | ✓ | ✓ | ✓ | Identical |
+| Startup Scripts | `START-SERVER.bat` | `START-SERVER.sh` | `START-SERVER.sh` | Platform-specific |
+| Verification Scripts | `verify-fixes.bat` | `verify-fixes.sh` | `verify-fixes.sh` | Platform-specific |
+
+### Key Cross-Platform Features
+
+✓ **Pure Browser-Based** - All code runs in the browser using standard Web APIs
+✓ **No Platform-Specific Code** - JavaScript uses only W3C standard APIs
+✓ **Relative Paths** - All file references use forward slashes (works everywhere)
+✓ **Standard Font Stack** - Optimized for Windows (Segoe UI), Linux (Ubuntu/Cantarell), and macOS (San Francisco)
+✓ **Dual Key Support** - Keyboard shortcuts work with both Ctrl (Windows/Linux) and Cmd (macOS)
+✓ **Canvas API** - Charts render identically on all platforms
+✓ **Locale-Aware** - Date and currency formatting respects OS locale settings
+
+### Platform-Specific Files
+
+**Startup Scripts:**
+- `START-SERVER.sh` - Bash script for Linux/macOS (uses Python 3, Python 2, or PHP)
+- `START-SERVER.bat` - Batch script for Windows (uses Python or PHP)
+
+**Verification Scripts:**
+- `verify-fixes.sh` - Bash script for Linux/macOS (verifies all fixes are in place)
+- `verify-fixes.bat` - Batch script for Windows (verifies all fixes are in place)
+
+### Running on Different Platforms
+
+**Windows:**
+```batch
+# Double-click or run from Command Prompt
+START-SERVER.bat
+
+# Verify installation
+verify-fixes.bat
+```
+
+**Linux/CachyOS/macOS:**
+```bash
+# Make executable (first time only)
+chmod +x START-SERVER.sh verify-fixes.sh
+
+# Run the server
+./START-SERVER.sh
+
+# Verify installation
+./verify-fixes.sh
+```
+
+### Browser Availability by Platform
+
+| Browser | Windows | Linux | macOS |
+|---------|---------|-------|-------|
+| Chrome | ✓ | ✓ | ✓ |
+| Firefox | ✓ | ✓ | ✓ |
+| Edge | ✓ | ✓ | ✓ |
+| Safari | ✗ | ✗ | ✓ |
+
+**Note:** All browsers provide identical functionality - choose based on your platform and preferences.
 
 ## Features at a Glance
 

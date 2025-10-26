@@ -851,7 +851,12 @@ function persistThemePreference(theme) {
     try {
         localStorage.setItem(STORAGE_KEYS.theme, theme);
     } catch (error) {
-        console.warn('Unable to store theme preference:', error);
+        if (error.name === 'QuotaExceededError' || error.code === 22) {
+            console.warn('Storage limit exceeded - unable to save theme preference:', error);
+            // Theme preference is non-critical, so we just warn in console
+        } else {
+            console.warn('Unable to store theme preference:', error);
+        }
     }
 }
 
