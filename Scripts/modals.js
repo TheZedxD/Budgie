@@ -132,9 +132,19 @@ export function closeModal(modal, elements) {
 
     // Restore previously focused element
     if (modalAccessibility.activeModal === modal) {
-        if (modalAccessibility.previouslyFocusedElement && typeof modalAccessibility.previouslyFocusedElement.focus === 'function') {
+        const elementToFocus = modalAccessibility.previouslyFocusedElement;
+        if (elementToFocus &&
+            typeof elementToFocus.focus === 'function' &&
+            document.body.contains(elementToFocus)) {
             window.requestAnimationFrame(() => {
-                modalAccessibility.previouslyFocusedElement.focus();
+                try {
+                    if (document.body.contains(elementToFocus) && typeof elementToFocus.focus === 'function') {
+                        elementToFocus.focus();
+                    }
+                } catch (e) {
+                    // Element may have been removed or is no longer focusable
+                    console.debug('Could not restore focus:', e);
+                }
             });
         }
         modalAccessibility.previouslyFocusedElement = null;
@@ -161,7 +171,20 @@ export function closeModal(modal, elements) {
  * @param {Object} elements - Elements object for chart cleanup
  */
 export function closeAllModals(allModals, elements) {
-    allModals.forEach(modal => modal?.classList.remove('active'));
+    allModals.forEach(modal => {
+        if (modal?.classList.contains('active')) {
+            modal.classList.remove('active');
+            // Remove tab trap listener if present
+            if (modal._tabTrapHandler) {
+                modal.removeEventListener('keydown', modal._tabTrapHandler);
+                delete modal._tabTrapHandler;
+            }
+        }
+    });
+
+    // Reset modal accessibility state
+    modalAccessibility.previouslyFocusedElement = null;
+    modalAccessibility.activeModal = null;
 
     if (elements) {
         reportsState.line.hoverIndex = null;
