@@ -472,30 +472,18 @@ function setOverlayVisibility() {
 }
 
 function openModal(modal) {
-    try {
-        openModalModule(modal, tooltipManager, elements);
-    } finally {
-        // Always update overlay visibility, even if error occurs
-        setOverlayVisibility();
-    }
+    openModalModule(modal, tooltipManager, elements);
+    setOverlayVisibility();
 }
 
 function closeModal(modal) {
-    try {
-        closeModalModule(modal, elements);
-    } finally {
-        // Always update overlay visibility, even if error occurs
-        setOverlayVisibility();
-    }
+    closeModalModule(modal, elements);
+    setOverlayVisibility();
 }
 
 function closeAllModals() {
-    try {
-        closeAllModalsModule(allModals, elements);
-    } finally {
-        // Always update overlay visibility, even if error occurs
-        setOverlayVisibility();
-    }
+    closeAllModalsModule(allModals, elements);
+    setOverlayVisibility();
 }
 
 // Wrapper function for renderCalendar

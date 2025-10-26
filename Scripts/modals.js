@@ -25,11 +25,21 @@ const modalAccessibility = {
  */
 export function setOverlayVisibility(elements, allModals) {
     if (!elements.overlay) {
+        console.warn('setOverlayVisibility: overlay element not found');
         return;
     }
     const panelOpen = elements.sidePanel?.classList.contains('open');
     const modalOpen = allModals.some(modal => modal?.classList.contains('active'));
-    elements.overlay.classList.toggle('active', Boolean(panelOpen || modalOpen));
+    const shouldBeActive = Boolean(panelOpen || modalOpen);
+
+    console.log('setOverlayVisibility:', {
+        panelOpen,
+        modalOpen,
+        shouldBeActive,
+        currentlyActive: elements.overlay.classList.contains('active')
+    });
+
+    elements.overlay.classList.toggle('active', shouldBeActive);
 }
 
 /**
@@ -149,80 +159,75 @@ export function openModal(modal, tooltipManager, elements) {
  * @param {Object} elements - Elements object containing modal references
  */
 export function closeModal(modal, elements) {
+    // CRITICAL: Remove active class FIRST, before anything else
+    // This must happen to prevent overlay from staying dark
+    if (!modal) {
+        console.warn('closeModal: modal is null/undefined');
+        return;
+    }
+
+    console.log('closeModal: Removing active class from modal', modal.id || modal.className);
+
+    // Remove active class immediately - this is the MOST important operation
+    modal.classList.remove('active');
+
+    console.log('closeModal: Active class removed, modal.classList:', Array.from(modal.classList));
+
+    // Save focus element before resetting state
+    const elementToFocus = modalAccessibility.previouslyFocusedElement;
+
+    // Reset modal accessibility state immediately
+    if (modalAccessibility.activeModal === modal) {
+        modalAccessibility.previouslyFocusedElement = null;
+        modalAccessibility.activeModal = null;
+    }
+
+    // Everything below is non-critical cleanup - wrap in try-catch
     try {
-        if (!modal) {
-            return;
-        }
-
-        modal.classList.remove('active');
-
         // Remove tab trap listener
-        try {
-            if (modal._tabTrapHandler) {
-                modal.removeEventListener('keydown', modal._tabTrapHandler);
-                delete modal._tabTrapHandler;
-            }
-        } catch (e) {
-            console.debug('Error removing tab trap handler:', e);
-        }
-
-        // Restore previously focused element - wrapped in try-catch to never throw
-        try {
-            if (modalAccessibility.activeModal === modal) {
-                const elementToFocus = modalAccessibility.previouslyFocusedElement;
-
-                // Only try to focus if element is valid
-                if (elementToFocus &&
-                    elementToFocus !== null &&
-                    elementToFocus.focus &&
-                    typeof elementToFocus.focus === 'function' &&
-                    document.body &&
-                    document.body.contains(elementToFocus)) {
-
-                    window.requestAnimationFrame(() => {
-                        try {
-                            if (elementToFocus &&
-                                elementToFocus.focus &&
-                                typeof elementToFocus.focus === 'function' &&
-                                document.body.contains(elementToFocus)) {
-                                elementToFocus.focus();
-                            }
-                        } catch (focusError) {
-                            // Silently handle focus errors - not critical
-                        }
-                    });
-                }
-
-                // Always reset state regardless of focus success
-                modalAccessibility.previouslyFocusedElement = null;
-                modalAccessibility.activeModal = null;
-            }
-        } catch (e) {
-            // Reset state even if error occurs
-            modalAccessibility.previouslyFocusedElement = null;
-            modalAccessibility.activeModal = null;
-            console.debug('Error restoring focus:', e);
-        }
-
-        // Clear chart hover states when closing chart modals
-        try {
-            if (elements && modal === elements.modals?.reports?.root) {
-                reportsState.line.hoverIndex = null;
-                reportsState.pie.hoverIndex = null;
-                hideReportsTooltip(elements);
-                renderReportsLineChart(elements);
-                renderReportsPieChart(elements);
-            } else if (elements && modal === elements.modals?.historicalReports?.root) {
-                historicalReportsState.line.hoverIndex = null;
-                historicalReportsState.pie.hoverIndex = null;
-                hideHistoricalReportsTooltip(elements);
-            }
-        } catch (e) {
-            console.debug('Error clearing chart states:', e);
+        if (modal._tabTrapHandler) {
+            modal.removeEventListener('keydown', modal._tabTrapHandler);
+            delete modal._tabTrapHandler;
         }
     } catch (e) {
-        // Catch-all to ensure function never throws
-        console.error('Error in closeModal:', e);
+        // Non-critical error, just log it
+    }
+
+    // Try to restore focus - this is nice-to-have, not required
+    try {
+        if (elementToFocus &&
+            typeof elementToFocus.focus === 'function' &&
+            document.body.contains(elementToFocus)) {
+
+            setTimeout(() => {
+                try {
+                    if (document.body.contains(elementToFocus)) {
+                        elementToFocus.focus();
+                    }
+                } catch (e) {
+                    // Focus failed, not a problem
+                }
+            }, 0);
+        }
+    } catch (e) {
+        // Focus restoration failed, not critical
+    }
+
+    // Clear chart hover states when closing chart modals
+    try {
+        if (elements && modal === elements.modals?.reports?.root) {
+            reportsState.line.hoverIndex = null;
+            reportsState.pie.hoverIndex = null;
+            hideReportsTooltip(elements);
+            renderReportsLineChart(elements);
+            renderReportsPieChart(elements);
+        } else if (elements && modal === elements.modals?.historicalReports?.root) {
+            historicalReportsState.line.hoverIndex = null;
+            historicalReportsState.pie.hoverIndex = null;
+            hideHistoricalReportsTooltip(elements);
+        }
+    } catch (e) {
+        // Chart cleanup failed, not critical
     }
 }
 
@@ -232,58 +237,49 @@ export function closeModal(modal, elements) {
  * @param {Object} elements - Elements object for chart cleanup
  */
 export function closeAllModals(allModals, elements) {
+    if (!allModals || !Array.isArray(allModals)) {
+        return;
+    }
+
+    // CRITICAL: Remove active class from ALL modals FIRST
+    allModals.forEach(modal => {
+        if (modal && modal.classList) {
+            modal.classList.remove('active');
+        }
+    });
+
+    // Reset modal accessibility state immediately
+    modalAccessibility.previouslyFocusedElement = null;
+    modalAccessibility.activeModal = null;
+
+    // Everything below is non-critical cleanup
     try {
-        if (allModals && Array.isArray(allModals)) {
-            allModals.forEach(modal => {
-                try {
-                    if (modal?.classList?.contains('active')) {
-                        modal.classList.remove('active');
-                        // Remove tab trap listener if present
-                        try {
-                            if (modal._tabTrapHandler) {
-                                modal.removeEventListener('keydown', modal._tabTrapHandler);
-                                delete modal._tabTrapHandler;
-                            }
-                        } catch (e) {
-                            console.debug('Error removing tab trap in closeAllModals:', e);
-                        }
-                    }
-                } catch (e) {
-                    console.debug('Error closing modal in closeAllModals:', e);
+        // Remove tab trap listeners
+        allModals.forEach(modal => {
+            try {
+                if (modal && modal._tabTrapHandler) {
+                    modal.removeEventListener('keydown', modal._tabTrapHandler);
+                    delete modal._tabTrapHandler;
                 }
-            });
-        }
-
-        // Reset modal accessibility state - always do this
-        try {
-            modalAccessibility.previouslyFocusedElement = null;
-            modalAccessibility.activeModal = null;
-        } catch (e) {
-            console.debug('Error resetting modal state:', e);
-        }
-
-        // Clear chart states
-        try {
-            if (elements) {
-                reportsState.line.hoverIndex = null;
-                reportsState.pie.hoverIndex = null;
-                hideReportsTooltip(elements);
-                historicalReportsState.line.hoverIndex = null;
-                historicalReportsState.pie.hoverIndex = null;
-                hideHistoricalReportsTooltip(elements);
+            } catch (e) {
+                // Listener removal failed, not critical
             }
-        } catch (e) {
-            console.debug('Error clearing chart states in closeAllModals:', e);
+        });
+    } catch (e) {
+        // Non-critical error
+    }
+
+    // Clear chart states
+    try {
+        if (elements) {
+            reportsState.line.hoverIndex = null;
+            reportsState.pie.hoverIndex = null;
+            hideReportsTooltip(elements);
+            historicalReportsState.line.hoverIndex = null;
+            historicalReportsState.pie.hoverIndex = null;
+            hideHistoricalReportsTooltip(elements);
         }
     } catch (e) {
-        // Catch-all to ensure function never throws
-        console.error('Error in closeAllModals:', e);
-        // Still try to reset modal state
-        try {
-            modalAccessibility.previouslyFocusedElement = null;
-            modalAccessibility.activeModal = null;
-        } catch (resetError) {
-            // Absolutely nothing we can do here
-        }
+        // Chart cleanup failed, not critical
     }
 }
